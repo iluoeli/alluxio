@@ -104,6 +104,19 @@ public class FileInStream extends InputStream implements BoundedStream, Position
     mBlockInStream = null;
   }
 
+  public FileInStream() {
+    mStatus = null;
+    mOptions = null;
+    mBlockStore = null;
+    mContext = null;
+
+    mLength = 0;
+    mBlockSize = 0;
+
+    mPosition = 0;
+    mBlockInStream = null;
+  };
+
   /* Input Stream methods */
   @Override
   public int read() throws IOException {
