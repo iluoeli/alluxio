@@ -87,13 +87,10 @@ public enum SKPolicy implements CachePolicy, Runnable {
     System.out.println("evict begin " + mCacheSize / (1024 * 1024) + " " + mCacheCapacity / (1024 * 1024) + " " + Thread.currentThread().getId());
     isEvicting = true;
     synchronized (mAccessLock) {
-      CacheSet c;
       if (useOne) {
         mOptimizer.addInputSpace(mInputSpace1);
-        c = mInputSpace1;
       } else {
         mOptimizer.addInputSpace(mInputSpace2);
-        c = mInputSpace2;
       }
       useOne = !useOne;
     }
@@ -103,16 +100,12 @@ public enum SKPolicy implements CachePolicy, Runnable {
     mLockManager.evictStart();
     long delete = 0;
     mContext.stopCache();
-
-
     try {
       synchronized (mAccessLock) {
         if (!useOne) {
-          //mInputSpace1.clear();
           move(mInputSpace2, result);
           result = mInputSpace2;
         } else {
-          //mInputSpace2.clear();
           move(mInputSpace1, result);
           result = mInputSpace1;
         }
@@ -120,7 +113,6 @@ public enum SKPolicy implements CachePolicy, Runnable {
           mGhost.clear();
         }
       }
-
       for (long fileId : result.keySet()) {
         Set<CacheUnit> inputSet = result.get(fileId);
         delete += mContext.mFileIdToInternalList.get(fileId).elimiate(inputSet);

@@ -12,12 +12,14 @@ public class StreamHitHandler {
 
 
   public StreamHitHandler() {
-    mStreamContext = new ClientCacheContext();
+    mStreamContext = new ClientCacheContext(false);
     mVisitQueue = new LinkedBlockingQueue<>();
   }
 
-  public void fliter(BaseCacheUnit unit, long fileLength) {
-    CacheUnit resultUnit = mStreamContext.getCache(unit.getFileId(), fileLength, unit.getBegin(), unit.getEnd());
+  public void handle(BaseCacheUnit unit, long fileLength) {
+    UnlockTask task = new UnlockTask();
+    CacheUnit resultUnit = mStreamContext.getCache(unit.getFileId(), fileLength, unit.getBegin(),
+      unit.getEnd(), task);
     List<CacheInternalUnit> tmpUnits = new ArrayList<>();
     if (resultUnit.isFinish()) {
       CacheInternalUnit resultUnit0 = (CacheInternalUnit) resultUnit;
@@ -25,12 +27,11 @@ public class StreamHitHandler {
     } else {
       TempCacheUnit resultUnit1 = (TempCacheUnit) resultUnit;
       tmpUnits.addAll(resultUnit1.mCacheConsumer);
-
     }
-    boolean isAccessed = true;
     double newUnitHit = 1;
     for (CacheInternalUnit resultUnit0 : tmpUnits) {
       for (CacheUnit tmpUnit : resultUnit0.accessRecord) {
+        if(unit.getEnd() <= tmpUnit.getBegin()) break;
         if (unit.isCoincience(tmpUnit)) {
           long coinEnd = Math.min(tmpUnit.getEnd(), unit.getEnd());
           long coinBegin = Math.max(tmpUnit.getBegin(), unit.getBegin());
@@ -38,9 +39,8 @@ public class StreamHitHandler {
           double coinPerNew = coincideSize / (double) (unit.getEnd() - unit.getBegin());
           double coinPerOld = coincideSize / (double) (tmpUnit.getEnd() - tmpUnit.getBegin());
           if (coincideSize == tmpUnit.getSize() && coincideSize == unit.getSize()) {
-            break;
+            continue;
           } else {
-            isAccessed = false;
             newUnitHit += coinPerNew;
             tmpUnit.setCurrentHitVal(tmpUnit.getHitValue() + coinPerOld);
           }
@@ -50,7 +50,7 @@ public class StreamHitHandler {
       }
     }
     unit.setCurrentHitVal(newUnitHit);
-    if (isAccessed) {
+    if (resultUnit.isFinish()) {
       tmpUnits.get(0).accessRecord.add(unit);
     } else {
       TempCacheUnit resultUnit1 = (TempCacheUnit) resultUnit;

@@ -64,7 +64,7 @@ public enum ReadMetric {
 		}
 	}
 
-
+  /*
 	public synchronized void metric(BlockInStream in, int read) {
 		mReadingSize += read;
 		mCurrentUnit.addReadingSize(read);
@@ -82,7 +82,7 @@ public enum ReadMetric {
 			default:
 				break;
 		}
-	}
+	}*/
 
 	public void Async2Sync(SKPolicy asyncPolicy, CachePolicy syncPolicy) {
 		CacheSet input;
@@ -97,7 +97,7 @@ public enum ReadMetric {
 		  	CacheUnit tmp = q.poll();
 				CacheInternalUnit currentUnit = (CacheInternalUnit) ClientCacheContext.INSTANCE.
 					mFileIdToInternalList.get(tmp.getFileId()).getKeyFromBucket
-					(tmp.getBegin(), tmp.getEnd());
+					(tmp.getBegin(), tmp.getEnd(), null);
 				syncPolicy.fliter(currentUnit, (BaseCacheUnit)tmp);
 			}
 		}
@@ -110,7 +110,7 @@ public enum ReadMetric {
       	BaseCacheUnit tmp = q.poll();
 				CacheInternalUnit currentUnit = (CacheInternalUnit) ClientCacheContext.INSTANCE.
 					mFileIdToInternalList.get(tmp.getFileId()).getKeyFromBucket
-					(tmp.getBegin(), tmp.getEnd());
+					(tmp.getBegin(), tmp.getEnd(), null);
 				asyncPolicy.fliter(currentUnit, tmp);
 			}
 		}

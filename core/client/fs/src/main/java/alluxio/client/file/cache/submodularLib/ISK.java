@@ -50,7 +50,6 @@ public class ISK extends IterateOptimizer<CacheUnit> {
   @Override
   public void iterateOptimize() {
     mIsConvergence = true;
-    long begin = System.currentTimeMillis();
     mSubgradient.setBaseSet(tmpResult);
     mSubgradient.addInputSpace(mInputSpace.copy());
     mSubgradient.optimize();
@@ -58,6 +57,7 @@ public class ISK extends IterateOptimizer<CacheUnit> {
     mPreResult = tmpResult.copy();
     mSubgradient.clear();
     iterNum++;
+    System.out.println(iterNum );
   }
 
   @Override

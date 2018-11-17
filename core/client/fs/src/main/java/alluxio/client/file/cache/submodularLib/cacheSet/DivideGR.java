@@ -163,25 +163,24 @@ public class DivideGR extends LRUPolicy {
   @Override
   public long evict() {
     long delete = 0;
+    LockTask task = new LockTask(mLockManager);
     while (mNeedDelete > 0) {
       BaseCacheUnit baseUnit = hitRatioQueue.poll();
+      task.setFileId(baseUnit.getFileId());
       CacheInternalUnit unit = (CacheInternalUnit) ClientCacheContext.INSTANCE.
-        mFileIdToInternalList.get(baseUnit.getFileId()).getKeyFromBucket(baseUnit.getBegin(), baseUnit.getEnd());
+        mFileIdToInternalList.get(baseUnit.getFileId()).getKeyFromBucket(baseUnit.getBegin(),
+        baseUnit.getEnd(), task);
+      task.unlockAllReadLocks();
       // change read lock to write lock
-      List<ReentrantReadWriteLock> l = null;
       try {
-        l = mLockManager.deleteLock(unit);
+        task.deleteLock(unit);
         unit.accessRecord.remove(baseUnit);
         deleteReCompute(unit, baseUnit);
         long deletetmp = deleteCache(unit);
         delete += deletetmp;
         mNeedDelete -= deletetmp;
       } finally {
-        if (l != null) {
-          for (ReentrantReadWriteLock lock : l) {
-            lock.writeLock().unlock();
-          }
-        }
+        task.unlockAll();
       }
     }
     return delete;

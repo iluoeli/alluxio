@@ -21,13 +21,12 @@ import java.nio.channels.FileChannel;
 import java.util.*;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 public class testRead {
   public static List<Long> beginList = new ArrayList<>();
-  public static boolean isWrite = false;
   public static int allInterruptedTime = 0;
   public static ExecutorService COMPUTE_POOL = Executors.newFixedThreadPool(1);
-  public static long time0 = 0;
 
   public static AlluxioURI writeToAlluxio(String s, String alluxioName) throws Exception {
     AlluxioURI uri = new AlluxioURI(alluxioName);
@@ -186,7 +185,7 @@ public class testRead {
   public static void promotionTest(String s) throws Exception {
     long begin = System.currentTimeMillis();
     AlluxioURI uri = new AlluxioURI(s);
-    FileSystem fs = FileSystem.Factory.get();
+    FileSystem fs = FileSystem.Factory.get(true);
     FileInStream in = fs.openFile(uri);
     long fileLength = fs.getStatus(uri).getLength();
     int bufferLenth = 1024 * 1024;
@@ -208,9 +207,8 @@ public class testRead {
     System.out.println(s + "read time: " + (System.currentTimeMillis() - begin));
   }
 
-
   public static void positionReadTest() throws Exception {
-    //ClientCacheContext.INSTANCE.searchTime = 0;
+    // ClientCacheContext.INSTANCE.searchTime = 0;
     long begin = System.currentTimeMillis();
     AlluxioURI uri = new AlluxioURI("/testWriteBig");
     FileSystem fs = FileSystem.Factory.get(true);
@@ -286,7 +284,6 @@ public class testRead {
   public static void main(String[] args) throws Exception {
     //	readFirst
     //if(!isWrite) {
-
     //  isWrite = true;
     //}
     //File f = new File("/home/innkp/read2");
@@ -294,15 +291,13 @@ public class testRead {
     //OutputStreamWriter out = new OutputStreamWriter(new FileOutputStream(f),
     // "gbk");
     //BufferedWriter writer = new BufferedWriter(out);
-    // AlluxioURI uri = writeToAlluxio("/usr/local/test.gz",
-    //  "/testWriteBig");
-    //writeToAlluxio("/usr/local/test.gz",
-    //  "/testWriteBig1");
+    //  AlluxioURI uri = writeToAlluxio("/usr/local/test.gz",
+    //   "/testWriteBig");
+    //writeToAlluxio("/usr/local/test.gz", "/testWriteBig");
     // promoteHeapTest();
-    List<ByteBuffer> ll = mmapTest("/usr/local/test.gz");
-    for (int i = 0; i < 30; i++) {
-      readFromMMap(ll);
-      System.out.print(i);
+
+    for (int i = 0; i < 100; i++) {
+      promotionTest( "/testWriteBig");
     }
     //writer.close();
     // FileSystem ff = FileSystem.Factory.get();

@@ -122,10 +122,10 @@ class ShortCircuitBlockReadHandler extends ChannelInboundHandlerAdapter {
                   mWorker
                       .moveBlock(mSessionId, request.getBlockId(), mStorageTierAssoc.getAlias(0));
                 } catch (BlockDoesNotExistException e) {
-                  LOG.debug("Block {} to promote does not exist in Alluxio: {}",
+                  LOG.debug("Block {} to update does not exist in Alluxio: {}",
                       request.getBlockId(), e.getMessage());
                 } catch (Exception e) {
-                  LOG.warn("Failed to promote block {}: {}", request.getBlockId(), e.getMessage());
+                  LOG.warn("Failed to update block {}: {}", request.getBlockId(), e.getMessage());
                 }
               }
               mLockId = mWorker.lockBlock(mSessionId, request.getBlockId());

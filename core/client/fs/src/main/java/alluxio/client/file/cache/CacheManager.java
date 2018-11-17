@@ -1,5 +1,7 @@
 package alluxio.client.file.cache;
 
+import org.omg.Messaging.SYNC_WITH_TRANSPORT;
+
 import java.io.IOException;
 
 public final class CacheManager {
@@ -34,7 +36,6 @@ public final class CacheManager {
 
   public int read(TempCacheUnit unit, byte[] b, int off, int readlen, long pos, boolean isAllowCache) throws IOException {
     int res = -1;
-    long begin = System.currentTimeMillis();
     res = unit.lazyRead(b, off, readlen, pos, isAllowCache);
     BaseCacheUnit unit1 = new BaseCacheUnit(pos, pos + res, unit.getFileId());
     unit1.setCurrentHitVal(unit.getNewCacheSize());
@@ -45,25 +46,28 @@ public final class CacheManager {
     } else {
       promoter.filter(unit1);
     }
-    mLockManager.writeUnlockList(unit.getFileId(), unit.lockedIndex);
+    unit.getLockTask().unlockAll();
     return res;
   }
 
   public int read(CacheInternalUnit unit, byte[] b, int off, long pos, int len) {
-    int remaining = unit.positionedRead(b, off, pos, len);
-    mLockManager.readUnlock(unit.getFileId(), unit.readLock);
-    BaseCacheUnit currentUnit = new BaseCacheUnit(pos, Math.min(unit.getEnd(), pos + len), unit.getFileId());
-    if (!isPromotion) {
-      evictor.fliter(unit, currentUnit);
-    } else {
-      promoter.filter(currentUnit);
+    try {
+      int remaining = unit.positionedRead(b, off, pos, len);
+      unit.getLockTask().unlockAllReadLocks();
+      BaseCacheUnit currentUnit = new BaseCacheUnit(pos, Math.min(unit.getEnd(), pos + len), unit.getFileId());
+      if (!isPromotion) {
+        evictor.fliter(unit, currentUnit);
+      } else {
+        promoter.filter(currentUnit);
+      }
+      return remaining;
+    } catch (Exception e) {
+      System.out.println(unit.mTestName);
+      throw new RuntimeException(e);
     }
-    return remaining;
   }
 
-  public int cache(TempCacheUnit unit, long pos, int len, LinkedFileBucket mBuckets) throws IOException {
-    int res = unit.cache(pos, len, mBuckets);
-    mLockManager.writeUnlockList(unit.getFileId(), unit.lockedIndex);
-    return res;
+  public int cache(TempCacheUnit unit, long pos, int len, FileCacheUnit unit1) throws IOException {
+    return  unit.cache(pos, len, unit1);
   }
 }

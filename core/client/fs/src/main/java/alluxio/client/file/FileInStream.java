@@ -47,13 +47,13 @@ import javax.annotation.concurrent.NotThreadSafe;
  * A streaming API to read a file. This API represents a file as a stream of bytes and provides a
  * collection of {@link #read} methods to access this stream of bytes. In addition, one can seek
  * into a given offset of the stream to read.
- *
+ * <p>
  * This class wraps the block in stream for each of the blocks in the file and abstracts the
  * switching between streams. The backing streams can read from Alluxio space in the local machine,
  * remote machines, or the under storage system.
- *
+ * <p>
  * The internal bookkeeping works as follows:
- *
+ * <p>
  * 1. {@link #updateStream()} is a potentially expensive operation and is responsible for
  * creating new BlockInStreams and updating {@link #mBlockInStream}. After calling this method,
  * {@link #mBlockInStream} is ready to serve reads from the current {@link #mPosition}.
@@ -66,10 +66,10 @@ import javax.annotation.concurrent.NotThreadSafe;
 @PublicApi
 @NotThreadSafe
 public class FileInStream extends InputStream implements BoundedStream, PositionedReadable,
-    Seekable {
+  Seekable {
   private static final Logger LOG = LoggerFactory.getLogger(FileInStream.class);
   private static final int MAX_WORKERS_TO_RETRY =
-      Configuration.getInt(PropertyKey.USER_BLOCK_WORKER_CLIENT_READ_RETRY);
+    Configuration.getInt(PropertyKey.USER_BLOCK_WORKER_CLIENT_READ_RETRY);
 
   private final URIStatus mStatus;
   private final InStreamOptions mOptions;
@@ -77,18 +77,28 @@ public class FileInStream extends InputStream implements BoundedStream, Position
   private final FileSystemContext mContext;
 
   /* Convenience values derived from mStatus, use these instead of querying mStatus. */
-  /** Length of the file in bytes. */
+  /**
+   * Length of the file in bytes.
+   */
   private final long mLength;
-  /** Block size in bytes. */
+  /**
+   * Block size in bytes.
+   */
   private final long mBlockSize;
 
   /* Underlying stream and associated bookkeeping. */
-  /** Current offset in the file. */
+  /**
+   * Current offset in the file.
+   */
   private long mPosition;
-  /** Underlying block stream, null if a position change has invalidated the previous stream. */
+  /**
+   * Underlying block stream, null if a position change has invalidated the previous stream.
+   */
   private BlockInStream mBlockInStream;
 
-  /** A map of worker addresses to the most recent epoch time when client fails to read from it. */
+  /**
+   * A map of worker addresses to the most recent epoch time when client fails to read from it.
+   */
   private Map<WorkerNetAddress, Long> mFailedWorkers = new HashMap<>();
 
   protected FileInStream(URIStatus status, InStreamOptions options, FileSystemContext context) {
@@ -115,7 +125,9 @@ public class FileInStream extends InputStream implements BoundedStream, Position
 
     mPosition = 0;
     mBlockInStream = null;
-  };
+  }
+
+  ;
 
   /* Input Stream methods */
   @Override
@@ -151,7 +163,7 @@ public class FileInStream extends InputStream implements BoundedStream, Position
   public int read(byte[] b, int off, int len) throws IOException {
     Preconditions.checkArgument(b != null, PreconditionMessage.ERR_READ_BUFFER_NULL);
     Preconditions.checkArgument(off >= 0 && len >= 0 && len + off <= b.length,
-        PreconditionMessage.ERR_BUFFER_STATE.toString(), b.length, off, len);
+      PreconditionMessage.ERR_BUFFER_STATE.toString(), b.length, off, len);
     if (len == 0) {
       return 0;
     }
@@ -231,7 +243,7 @@ public class FileInStream extends InputStream implements BoundedStream, Position
       try {
         long offset = pos % mBlockSize;
         int bytesRead =
-            stream.positionedRead(offset, b, off, (int) Math.min(mBlockSize - offset, len));
+          stream.positionedRead(offset, b, off, (int) Math.min(mBlockSize - offset, len));
         Preconditions.checkState(bytesRead > 0, "No data is read before EOF");
         pos += bytesRead;
         off += bytesRead;
@@ -265,7 +277,7 @@ public class FileInStream extends InputStream implements BoundedStream, Position
     }
     Preconditions.checkArgument(pos >= 0, PreconditionMessage.ERR_SEEK_NEGATIVE.toString(), pos);
     Preconditions.checkArgument(pos <= mLength,
-        PreconditionMessage.ERR_SEEK_PAST_END_OF_FILE.toString(), pos);
+      PreconditionMessage.ERR_SEEK_PAST_END_OF_FILE.toString(), pos);
 
     if (mBlockInStream == null) { // no current stream open, advance position
       mPosition = pos;
@@ -334,21 +346,21 @@ public class FileInStream extends InputStream implements BoundedStream, Position
           // Construct the async cache request
           long blockLength = mOptions.getBlockInfo(blockId).getLength();
           Protocol.AsyncCacheRequest request =
-              Protocol.AsyncCacheRequest.newBuilder().setBlockId(blockId).setLength(blockLength)
-                  .setOpenUfsBlockOptions(mOptions.getOpenUfsBlockOptions(blockId))
-                  .setSourceHost(dataSource.getHost()).setSourcePort(dataSource.getDataPort())
-                  .build();
+            Protocol.AsyncCacheRequest.newBuilder().setBlockId(blockId).setLength(blockLength)
+              .setOpenUfsBlockOptions(mOptions.getOpenUfsBlockOptions(blockId))
+              .setSourceHost(dataSource.getHost()).setSourcePort(dataSource.getDataPort())
+              .build();
           Channel channel = mContext.acquireNettyChannel(worker);
           try {
             NettyRPCContext rpcContext =
-                NettyRPCContext.defaults().setChannel(channel).setTimeout(channelTimeout);
+              NettyRPCContext.defaults().setChannel(channel).setTimeout(channelTimeout);
             NettyRPC.fireAndForget(rpcContext, new ProtoMessage(request));
           } finally {
             mContext.releaseNettyChannel(worker, channel);
           }
         } catch (Exception e) {
           LOG.warn("Failed to complete async cache request for block {} at worker {}: {}", blockId,
-              worker, e.getMessage());
+            worker, e.getMessage());
         }
       }
     }
@@ -357,7 +369,7 @@ public class FileInStream extends InputStream implements BoundedStream, Position
   private void handleRetryableException(BlockInStream stream, IOException e) {
     WorkerNetAddress workerAddress = stream.getAddress();
     LOG.warn("Failed to read block {} from worker {}, will retry: {}",
-        stream.getId(), workerAddress, e.getMessage());
+      stream.getId(), workerAddress, e.getMessage());
     try {
       stream.close();
     } catch (Exception ex) {

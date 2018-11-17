@@ -13,28 +13,12 @@ public class SliceMovedByteBuf extends PartialByteBuf {
 
 	@Override
 	public ByteBuf slice(int a, int b) {
-		Preconditions.checkArgument( a + b < mLength);
-    List<ByteBuf> newPage = PageManager.INSTANCE.getCache(b);
-		return this;
+		return null;
 	}
 
 	@Override
 	public ByteBuf slice() {
-		long left = mLength - mBuffer.readerIndex();
-		List<ByteBuf> newPage = PageManager.INSTANCE.getCache(left);
-    int index = readerIndex();
-    int bufIndex = 0;
-    ByteBuf curr = newPage.get(bufIndex);
-    do {
-			curr = newPage.get(bufIndex);
-
-			curr.writeBytes(mBuffer, index, curr.capacity());
-			index += curr.capacity();
-			bufIndex ++;
-		} while(index < mLength && bufIndex < newPage.size());
-		release();
-		PageManager.INSTANCE.releaseBuffer(this);
-		return new CompositePage(newPage);
+		return null;
 	}
 
 	@Override

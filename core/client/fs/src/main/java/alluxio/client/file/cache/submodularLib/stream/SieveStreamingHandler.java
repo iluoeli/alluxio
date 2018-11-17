@@ -4,7 +4,7 @@ import alluxio.client.file.cache.*;
 
 import java.util.*;
 
-public class SieveStreaming {
+public class SieveStreamingHandler {
   private LinkedList<Integer> mOSet = new LinkedList<>();
   private final double mEValue;
   private Map<Integer, ClientCacheContext> mBaseMap = new HashMap<>();
@@ -12,14 +12,14 @@ public class SieveStreaming {
   private double mOPTLowbound;
   private double mOPTUpperbound;
 
-  public SieveStreaming(long mLimit) {
+  public SieveStreamingHandler(long mLimit) {
     mCacheSpace = mLimit;
     mOPTUpperbound = 0;
     mOPTLowbound = 0;
     mEValue = 0.5;
   }
 
-  public void filter(BaseCacheUnit unit, long fileLength) {
+  public void handle(BaseCacheUnit unit, long fileLength) {
     updateOPTBound(unit);
     updateBaseCache();
     reComputeMaxHit(unit, fileLength);
@@ -33,13 +33,19 @@ public class SieveStreaming {
 
   private double reCompute0(BaseCacheUnit unit, int baseIndex, long fileLength) {
     ClientCacheContext baseCache = mBaseMap.get(baseIndex);
-    CacheUnit resultUnit = baseCache.getCache(unit.getFileId(), fileLength, unit.getBegin(), unit.getEnd());
+    UnlockTask task = new UnlockTask();
+    CacheUnit resultUnit = baseCache.getCache(unit.getFileId(), fileLength, unit.getBegin(), unit
+      .getEnd(), task);
+    int index = baseCache.mFileIdToInternalList.get(unit.getFileId()).mBuckets.getIndex(unit.getBegin(), unit.getEnd());
+    LinkedFileBucket.RBTreeBucket bucket = (LinkedFileBucket.RBTreeBucket) baseCache.mFileIdToInternalList.get(unit.getFileId()).mBuckets.mCacheIndex0[index];
     List<CacheInternalUnit> tmpUnits = new ArrayList<>();
     long newSpace = 0;
+    boolean isAccessed = true;
     if (resultUnit.isFinish()) {
       CacheInternalUnit resultUnit0 = (CacheInternalUnit) resultUnit;
       tmpUnits.add(resultUnit0);
     } else {
+      isAccessed = false;
       TempCacheUnit resultUnit1 = (TempCacheUnit) resultUnit;
       tmpUnits.addAll(resultUnit1.mCacheConsumer);
       long oldSpace = 0;
@@ -48,22 +54,22 @@ public class SieveStreaming {
       }
       newSpace = resultUnit1.getSize() - oldSpace;
     }
-    boolean isAccessed = true;
     double hitVal = unit.getHitValue();
+    boolean finish = false;
     for (CacheInternalUnit resultUnit0 : tmpUnits) {
+      if (finish) break;
       for (CacheUnit tmpUnit : resultUnit0.accessRecord) {
-        if (unit.isCoincience(tmpUnit)) {
+        if (unit.getEnd() <= tmpUnit.getBegin()) {
+          finish = true;
+          break;
+        } else if (unit.isCoincience(tmpUnit)) {
           long coinEnd = Math.min(tmpUnit.getEnd(), unit.getEnd());
           long coinBegin = Math.max(tmpUnit.getBegin(), unit.getBegin());
           int coincideSize = (int) (coinEnd - coinBegin);
           double coinPerNew = coincideSize / (double) (unit.getEnd() - unit.getBegin());
-          //double coinPerOld = coincideSize / (double) (tmpUnit.getEnd() - tmpUnit.getBegin());
-          if (coincideSize == tmpUnit.getSize() && coincideSize == unit.getSize()) {
+          isAccessed = false;
+          hitVal -= coinPerNew;
 
-          } else {
-            isAccessed = false;
-            hitVal -= coinPerNew;
-          }
         }
       }
     }
@@ -83,15 +89,14 @@ public class SieveStreaming {
       baseCache.mUsedCacheSpace += newSpace;
     }
     return baseCache.mHitvalue;
-
   }
 
   private void updateBaseCache() {
     List<Integer> needRemove = new ArrayList<>();
     int max = 0;
-
-    while (!mOSet.isEmpty()) {
-      int currIndex = mOSet.peekFirst();
+    Iterator<Integer> iter = mOSet.iterator();
+    while (iter.hasNext()) {
+      int currIndex = iter.next();
       double opt = Math.pow(1 + mEValue, currIndex);
       if (opt < mOPTLowbound || opt > mOPTUpperbound) {
         needRemove.add(currIndex);
@@ -106,7 +111,7 @@ public class SieveStreaming {
     double tmp = Math.pow(1 + mEValue, max + 1);
     while (tmp > mOPTLowbound && tmp < mOPTUpperbound) {
       mOSet.push(max);
-      mBaseMap.put(max, new ClientCacheContext());
+      mBaseMap.put(max, new ClientCacheContext(false));
       tmp = Math.pow(1 + mEValue, ++max);
     }
   }
@@ -117,23 +122,21 @@ public class SieveStreaming {
     for (int i : mBaseMap.keySet()) {
       double currHit = mBaseMap.get(i).mHitvalue;
       if (maxHit < currHit) {
-        currHit = maxHit;
+        maxHit = currHit;
         maxIndex = i;
       }
     }
+    System.out.println("max hit: " + maxHit);
     return mBaseMap.get(maxIndex).mFileIdToInternalList;
   }
 
-
   private void updateOPTBound(BaseCacheUnit unit) {
     mOPTLowbound = Math.max(mOPTLowbound, unit.getHitValue());
-    mOPTUpperbound = Math.max(unit.getHitValue() / (double) unit.getSize() * mCacheSpace, mOPTUpperbound);
+    mOPTUpperbound = Math.max(unit.getHitValue() / (double) unit.getSize() * mCacheSpace * 2, mOPTUpperbound);
   }
-
 
   private double getLimit(int i, double hitvalue, long usedSpace) {
     double opt = Math.pow(1 + mEValue, i);
-    ;
     return ((opt / 2) - hitvalue) / (mCacheSpace - usedSpace);
   }
 }

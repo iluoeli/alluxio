@@ -28,6 +28,7 @@ public final class MetedataCache {
   private ClientCacheContext mContext = ClientCacheContext.INSTANCE;
   public static Map<FileInStream, Map<Long, BlockInStream>> mBlockStreamCache = new HashMap<>();
   public HashMap<Long, Map<Long, DataBuffer>> tmpCache = new HashMap<>();
+  private Map<Long, Long> mFileIDToLengthMap = new HashMap<>();
 
   public MetedataCache() {
     //mContext.COMPUTE_POOL.submit(new ExistChecker());
@@ -39,7 +40,11 @@ public final class MetedataCache {
   }
 
   public long getFileLength(long fileId) {
-    return mFileMetedataSet.get(fileId).getLength();
+    return mFileIDToLengthMap.get(fileId);
+  }
+
+  public void updateFileLength(long fileId, long fileLength) {
+    mFileIDToLengthMap.put(fileId, fileLength);
   }
 
   public URIStatus getStatus(AlluxioURI uri) {
@@ -57,24 +62,23 @@ public final class MetedataCache {
   public void cacheMetedata(AlluxioURI uri, URIStatus stus) {
     mURISet.put(uri, stus);
     mFileMetedataSet.put(stus.getFileId(), stus);
+    mFileIDToLengthMap.put(stus.getFileId(), stus.getLength());
   }
 
   private boolean isExist(AlluxioURI path) throws IOException, AlluxioException {
-    {
-      FileSystemMasterClient masterClient = mFileSystemContext.acquireMasterClient();
-      try {
-        // TODO(calvin): Make this more efficient
-        masterClient.getStatus(path, GetStatusOptions.defaults());
-        return true;
-      } catch (NotFoundException e) {
-        return false;
-      } catch (UnavailableException e) {
-        throw e;
-      } catch (AlluxioStatusException e) {
-        throw e.toAlluxioException();
-      } finally {
-        mFileSystemContext.releaseMasterClient(masterClient);
-      }
+    FileSystemMasterClient masterClient = mFileSystemContext.acquireMasterClient();
+    try {
+      // TODO(calvin): Make this more efficient
+      masterClient.getStatus(path, GetStatusOptions.defaults());
+      return true;
+    } catch (NotFoundException e) {
+      return false;
+    } catch (UnavailableException e) {
+      throw e;
+    } catch (AlluxioStatusException e) {
+      throw e.toAlluxioException();
+    } finally {
+      mFileSystemContext.releaseMasterClient(masterClient);
     }
   }
 

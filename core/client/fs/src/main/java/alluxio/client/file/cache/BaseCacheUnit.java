@@ -15,6 +15,8 @@ public class BaseCacheUnit extends LinkNode<BaseCacheUnit> implements CacheUnit 
     mPureIncrease = 0;
   }
 
+  public void addReadLockIndex(int index) {}
+
   public long getPureIncrease() {
     return mPureIncrease;
   }
@@ -57,7 +59,6 @@ public class BaseCacheUnit extends LinkNode<BaseCacheUnit> implements CacheUnit 
 
 
   public boolean isCoincience(CacheUnit u2) {
-    long begin = System.currentTimeMillis();
     try {
       if (getFileId() != u2.getFileId()) {
         return false;
@@ -86,4 +87,8 @@ public class BaseCacheUnit extends LinkNode<BaseCacheUnit> implements CacheUnit 
   public int compareTo(BaseCacheUnit node) {
     return 0;
   }
+
+  public void setLockTask(LockTask task){}
+
+  public LockTask getLockTask(){return null;}
 }

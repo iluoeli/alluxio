@@ -64,9 +64,10 @@ public class CacheSpaceCalculator extends FunctionCalculator<CacheUnit> {
       CacheUnit unit = iter.next();
       PreviousIterator<CacheInternalUnit> prevIter = tmpUnit.previousIterator();
 
-      CacheUnit tmpunit = ClientCacheContext.INSTANCE.getKeyByReverse(unit.getBegin(), unit.getEnd(), unit.getFileId(), prevIter, -1);
+      CacheUnit tmpunit = ClientCacheContext.UTILS.getKeyByReverse(unit.getBegin(), unit.getEnd(),
+        unit.getFileId(), prevIter, -1, new UnlockTask());
       if (!tmpunit.isFinish()) {
-        ClientCacheContext.INSTANCE.convertCache((TempCacheUnit) tmpunit, tmpUnit);
+        ClientCacheContext.UTILS.convertCache((TempCacheUnit) tmpunit, tmpUnit);
       }
     }
     Iterator<CacheInternalUnit> tmpIter = tmpUnit.iterator();

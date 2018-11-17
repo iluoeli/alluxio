@@ -24,6 +24,7 @@ public class CacheHitCalculator extends FunctionCalculator<CacheUnit> {
   private DoubleLinkedList<CacheInternalUnit> spaceUtil;
   private PreviousIterator<CacheInternalUnit> spaceIter;
   public long begin;
+  private UnlockTask task = new UnlockTask();
 
   public CacheHitCalculator(SubmodularSetUtils utils) {
     super(utils);
@@ -146,10 +147,11 @@ public class CacheHitCalculator extends FunctionCalculator<CacheUnit> {
 
     if (mComputeSpace) {
       PreviousIterator<CacheInternalUnit> tmpSpaceIter = spaceUtil.previousIterator();
-      CacheUnit tmpunit = ClientCacheContext.INSTANCE.getKeyByReverse(maxUnit.getBegin(), maxUnit.getEnd(), maxUnit.getFileId(), tmpSpaceIter, -1);
+      CacheUnit tmpunit = ClientCacheContext.UTILS.getKeyByReverse(maxUnit.getBegin(),
+        maxUnit.getEnd(), maxUnit.getFileId(), tmpSpaceIter, -1, task);
       if (!tmpunit.isFinish()) {
         TempCacheUnit newUnit = (TempCacheUnit) tmpunit;
-        ClientCacheContext.INSTANCE.convertCache(newUnit, spaceUtil);
+        ClientCacheContext.UTILS.convertCache(newUnit, spaceUtil);
       }
       mSpaceSize += mCurrentMaxSize;
     }
@@ -220,10 +222,11 @@ public class CacheHitCalculator extends FunctionCalculator<CacheUnit> {
   private void changeSpaceSize(CacheUnit unit, BaseCacheUnit tmp) {
     if (mComputeSpace && !mSpaceIsComputed) {
 
-      CacheUnit tmpunit = ClientCacheContext.INSTANCE.getKeyByReverse(tmp.getBegin(), tmp.getEnd(), tmp.getFileId(), spaceIter, -1);
+      CacheUnit tmpunit = ClientCacheContext.UTILS.getKeyByReverse(tmp.getBegin(),
+        tmp.getEnd(), tmp.getFileId(), spaceIter, -1, task);
       if (!tmpunit.isFinish()) {
         TempCacheUnit newUnit = (TempCacheUnit) tmpunit;
-        mCurrentIncreaseSize = ClientCacheContext.INSTANCE.computeIncrese(newUnit);
+        mCurrentIncreaseSize = ClientCacheContext.UTILS.computeIncrese(newUnit);
       } else {
         mCurrentIncreaseSize = 0;
       }

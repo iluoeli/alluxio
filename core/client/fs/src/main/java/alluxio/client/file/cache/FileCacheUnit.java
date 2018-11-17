@@ -12,46 +12,52 @@
 package alluxio.client.file.cache;
 
 import alluxio.AlluxioURI;
+import alluxio.Client;
 import alluxio.client.file.FileInStream;
 import alluxio.client.file.FileSystem;
 import alluxio.client.file.cache.struct.DoubleLinkedList;
 import alluxio.client.file.cache.struct.LongPair;
+import alluxio.client.file.cache.submodularLib.cacheSet.CacheHitCalculator;
 import alluxio.exception.AlluxioException;
-import alluxio.proto.journal.Block;
-import sun.misc.Cache;
+import com.google.common.base.Preconditions;
+import com.sun.prism.shader.Solid_TextureYV12_AlphaTest_Loader;
+import io.netty.buffer.ByteBuf;
+import io.netty.buffer.ByteBufUtil;
 
 import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
+import static alluxio.client.file.cache.ClientCacheContext.mREadUnlockList;
+import static alluxio.client.file.cache.ClientCacheContext.mReadLockList;
+
 public class FileCacheUnit {
   private DoubleLinkedList<CacheInternalUnit> cacheList;
   private long mFileId;
   public LinkedFileBucket mBuckets;
-  private static boolean use_bucket;
+  private boolean use_bucket;
   private final ClientCacheContext.LockManager mLockManager;
-  private static final ClientCacheContext mContext = ClientCacheContext.INSTANCE;
+  private final ClientCacheContext mContext;
 
-  static {
-    use_bucket = mContext.USE_INDEX_0;
-  }
-
-  public FileCacheUnit(long fileId, long length, ClientCacheContext.LockManager mLockManager) {
+  public FileCacheUnit(long fileId, long length, ClientCacheContext mContext) {
     mFileId = fileId;
+    this.mContext = mContext;
+    use_bucket = mContext.USE_INDEX_0;
     cacheList = new DoubleLinkedList<>(new CacheInternalUnit(0, 0, -1));
     if (use_bucket) {
-      mBuckets = new LinkedFileBucket(length, fileId, mLockManager);
+      mBuckets = new LinkedFileBucket(length, fileId, mContext);
     }
-    this.mLockManager = mLockManager;
+    this.mLockManager = mContext.getLockManager();
+
   }
 
   public DoubleLinkedList<CacheInternalUnit> getCacheList() {
     return cacheList;
   }
 
-  public CacheUnit getKeyFromBucket(long begin, long end) {
-    return mBuckets.find(begin, end);
+  public CacheUnit getKeyFromBucket(long begin, long end, LockTask task) {
+    return mBuckets.find(begin, end, task);
   }
 
   public void cacheCoinFiliter(PriorityQueue<LongPair> queue, Queue<LongPair> tmpQueue) {
@@ -177,77 +183,104 @@ public class FileCacheUnit {
     System.out.println(space / (1024 * 1024));
   }
 
-  private void deleteCache(CacheInternalUnit current) {
-    List<ReentrantReadWriteLock> writeLocks = mLockManager.deleteLock(current);
-    try {
-      mBuckets.delete(current);
-      cacheList.delete(current);
-      current.clearData();
-      //newSize -= current.getSize();
-    } finally {
-      if (writeLocks != null) {
-        for (ReentrantReadWriteLock w : writeLocks) {
-          w.writeLock().unlock();
+  private CacheInternalUnit deleteCache(CacheInternalUnit current) {
+    CacheInternalUnit next = current.after;
+    current.clearData();
+    mBuckets.delete(current);
+    cacheList.delete(current);
+    //newSize -= current.getSize();
+    current = null;
+    return next;
+  }
+
+  /**
+   * Cache part of file data, using for test cases basically.
+   */
+  public void cache(AlluxioURI uri, long begin, long end) throws Exception {
+    FileSystem fs = FileSystem.Factory.get(true);
+    FileInStream in = fs.openFile(uri);
+    LockTask task = new LockTask(mLockManager, mFileId);
+    CacheUnit newUnit = getKeyFromBucket(begin, end, task);
+    if (newUnit instanceof TempCacheUnit) {
+      TempCacheUnit tmpUnit = (TempCacheUnit) newUnit;
+      tmpUnit.setInStream((FileInStreamWithCache) in);
+      mContext.getCacheManager().cache(tmpUnit, begin, (int) (end - begin), this);
+    }
+    task.unlockAll();
+  }
+
+  private void check(CacheInternalUnit unit) {
+    int tmp = 0;
+    for (ByteBuf b : unit.mData) {
+      tmp += b.capacity();
+    }
+    Preconditions.checkArgument(tmp == unit.getSize());
+  }
+
+  public long merge0(AlluxioURI uri, Queue<LongPair> tmpQueue) throws IOException, AlluxioException {
+    LockTask task = new LockTask(mLockManager, mFileId);
+    FileSystem fs = FileSystem.Factory.get(true);
+    FileInStream in = fs.openFile(uri);
+    long newSize = 0;
+    CacheInternalUnit curr = cacheList.head.after;
+
+    while (!tmpQueue.isEmpty()) {
+      LongPair l = tmpQueue.poll();
+      while (curr != null && curr.getEnd() < l.getKey()) {
+        task.deleteLock(curr);
+        curr = deleteCache(curr);
+      }
+      task.deleteUnlock();
+
+      if (l.getKey() - l.getValue() == 0) continue;
+      CacheUnit newUnit = getKeyFromBucket(l.getKey(), l.getValue(), task);
+      if (newUnit instanceof TempCacheUnit) {
+        TempCacheUnit tmpUnit = (TempCacheUnit) newUnit;
+        tmpUnit.setInStream((FileInStreamWithCache) in);
+        int len = (int) (l.getValue() - l.getKey());
+        int res = mContext.getCacheManager().cache(tmpUnit, l.getKey(), len, this);
+        if (res != len) {
+          // the end of file
+          //tmpUnit.resetEnd((int) mLength);
         }
+        newSize += res;
+
+        curr = addCache(tmpUnit).after;
+        task.unlockAll();
+      } else {
+        // TODO split the CacheInternalUnit
+        curr = ((CacheInternalUnit) newUnit).after;
+        task.unlockAll();
       }
     }
+    while (curr != null) {
+      task.deleteLock(curr);
+      curr = deleteCache(curr);
+    }
+    task.deleteUnlock();
+    return newSize;
+
   }
 
   /**
    * Return the new Cache size promoted from under_fs
    */
   public long merge(AlluxioURI uri, Queue<CacheUnit> queue) throws IOException, AlluxioException {
-    FileSystem fs = FileSystem.Factory.get(true);
-    FileInStream in = fs.openFile(uri);
-
-    CacheInternalUnit curr = cacheList.head.after;
     Queue<LongPair> tmpQueue = new LinkedBlockingQueue<>();
     cacheCoinFiliter(queue, tmpQueue);
-    long newSize = 0;
-    while (!tmpQueue.isEmpty()) {
-      LongPair l = tmpQueue.poll();
-      while (curr != null && curr.getEnd() < l.getKey()) {
-        CacheInternalUnit next = curr.after;
-        deleteCache(curr);
-        curr = next;
-      }
-      CacheUnit newUnit = getKeyFromBucket(l.getKey(), l.getValue());
-      if (newUnit instanceof TempCacheUnit) {
-        TempCacheUnit tmpUnit = (TempCacheUnit) newUnit;
-
-        tmpUnit.setInStream((FileInStreamWithCache) in);
-        int len = (int) (l.getValue() - l.getKey());
-        int res = mContext.getCacheManager().cache(tmpUnit, l.getKey(), len, mBuckets);
-        if (res != len) {
-          // the end of file
-          //tmpUnit.resetEnd((int) mLength);
-        }
-        newSize += res;
-        curr = addCache(tmpUnit).after;
-
-      } else {
-        // TODO split the CacheInternalUnit
-        curr = ((CacheInternalUnit) newUnit).after;
-      }
-    }
-    while (curr != null) {
-      CacheInternalUnit next = curr.after;
-      deleteCache(curr);
-      curr = next;
-    }
-
-    return newSize;
+    return merge0(uri, tmpQueue);
   }
 
 
   public long elimiate(Set<CacheUnit> input) {
     long deleteSizeSum = 0;
     HashMap<CacheUnit, PriorityQueue<LongPair>> tmpMap = new HashMap<>();
+    LockTask task = new LockTask(mLockManager, mFileId);
     for (CacheUnit unit : input) {
       CacheInternalUnit cache = null;
       try {
-        cache = (CacheInternalUnit) getKeyFromBucket(unit.getBegin(), unit.getEnd());
-        mLockManager.readUnlock(cache.getFileId(), cache.readLock);
+        cache = (CacheInternalUnit) getKeyFromBucket(unit.getBegin(), unit.getEnd(), task);
+        task.unlockAllReadLocks();
         if (!tmpMap.containsKey(cache)) {
           PriorityQueue<LongPair> queue = new PriorityQueue<>(new Comparator<LongPair>() {
             @Override
@@ -271,7 +304,7 @@ public class FileCacheUnit {
       CacheInternalUnit next = null;
       boolean deleteAll = false;
       long deleteSize;
-      List<ReentrantReadWriteLock> writeLocks = mLockManager.deleteLock(current);
+      task.deleteLock(current);
       try {
         if (tmpMap.containsKey(current)) {
           cacheCoinFiliter(tmpMap.get(current), tmpQueue);
@@ -297,11 +330,7 @@ public class FileCacheUnit {
           current = null;
         }
       } finally {
-        if (writeLocks != null) {
-          for (ReentrantReadWriteLock w : writeLocks) {
-            w.writeLock().unlock();
-          }
-        }
+        task.deleteUnlock();
         current = next;
       }
     }

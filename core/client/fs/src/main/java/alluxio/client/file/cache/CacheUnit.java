@@ -29,4 +29,7 @@ public interface CacheUnit extends Element {
 
   public void setCurrentHitVal(double hit);
 
+  public void setLockTask(LockTask task);
+
+  public LockTask getLockTask();
 }

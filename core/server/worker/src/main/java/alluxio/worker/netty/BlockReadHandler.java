@@ -139,10 +139,10 @@ public final class BlockReadHandler extends AbstractReadHandler<BlockReadRequest
         try {
           mWorker.moveBlock(request.getSessionId(), request.getId(), mStorageTierAssoc.getAlias(0));
         } catch (BlockDoesNotExistException e) {
-          LOG.debug("Block {} to promote does not exist in Alluxio: {}", request.getId(),
+          LOG.debug("Block {} to update does not exist in Alluxio: {}", request.getId(),
               e.getMessage());
         } catch (Exception e) {
-          LOG.warn("Failed to promote block {}: {}", request.getId(), e.getMessage());
+          LOG.warn("Failed to update block {}: {}", request.getId(), e.getMessage());
         }
       }
 

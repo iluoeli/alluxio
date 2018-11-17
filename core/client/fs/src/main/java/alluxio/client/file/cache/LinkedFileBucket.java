@@ -2,6 +2,7 @@ package alluxio.client.file.cache;
 
 import alluxio.client.file.cache.struct.LinkNode;
 import alluxio.client.file.cache.struct.RBTree;
+import org.omg.Messaging.SYNC_WITH_TRANSPORT;
 
 import java.util.Iterator;
 
@@ -12,23 +13,34 @@ public class LinkedFileBucket {
   /**
    * The num of fileBucket of one file
    */
-  private int BUCKET_LENGTH = ClientCacheContext.INSTANCE.BUCKET_LENGTH;
+  private int BUCKET_LENGTH;
   /**
    * The length of one bucket.
    */
   private long mBucketLength;
-  private final boolean IS_REVERT = ClientCacheContext.INSTANCE.REVERSE;
+  private final boolean IS_REVERT;
   private final long mFileId;
+  private ClientCacheContext mCacheContext;
   private final ClientCacheContext.LockManager mLockManager;
 
-  public LinkedFileBucket(long fileLength, long fileId, ClientCacheContext.LockManager lockManager) {
+  public LinkedFileBucket(long fileLength, long fileId, ClientCacheContext context) {
+    mCacheContext = context;
+    BUCKET_LENGTH = mCacheContext.BUCKET_LENGTH;
+    IS_REVERT = mCacheContext.REVERSE;
+    mFileId = fileId;
+    mLockManager = context.getLockManager();
     mBucketLength = (long) (fileLength / (double) BUCKET_LENGTH);
-    if (fileLength % BUCKET_LENGTH != 0) {
+    if (fileLength % mBucketLength != 0) {
       BUCKET_LENGTH++;
     }
-    mFileId = fileId;
     mCacheIndex0 = new LinkBucket[BUCKET_LENGTH];
-    mLockManager = lockManager;
+    initBucketLock();
+  }
+
+  private void initBucketLock() {
+    for (int  i = 0 ; i < BUCKET_LENGTH; i ++) {
+      mLockManager.initBucketLock(mFileId, i);
+    }
   }
 
   public int getIndex(long begin, long end) {
@@ -50,6 +62,7 @@ public class LinkedFileBucket {
       bucket = new RBTreeBucket(index);
       mCacheIndex0[index] = bucket;
     }
+
     bucket.addNew(unit);
   }
 
@@ -58,50 +71,69 @@ public class LinkedFileBucket {
     mCacheIndex0[index].delete(unit);
   }
 
-  public CacheUnit find(long begin, long end) {
+  private void readLockWithInit(int index) {
+      mLockManager.readLock(fileId, index, "find");
 
+  }
+
+  public CacheUnit find(long begin, long end, LockTask newTask) {
     int index = getIndex(begin, end);
-    LinkBucket bucket = mCacheIndex0[index];
+    CacheUnit unit =  find0(index, begin, end, newTask );
+    unit.setLockTask(newTask);
+    return unit;
+  }
 
+
+  public CacheUnit find0(int index, long begin, long end, LockTask task) {
+    LinkBucket bucket = mCacheIndex0[index];
+    //boolean needUnlockIndex = true;
     if (bucket == null || bucket.mUnitNum == 0) {
-      mLockManager.initBucketLock(mFileId, index);
       int left, right;
       left = right = index;
       while (true) {
+        if (left == right) task.readUnlock(index);
         left--;
         right++;
         if (left < 0) {
-          mLockManager.initBucketLock(mFileId, 0);
-          return ClientCacheContext.INSTANCE.getKeyFromBegin(begin, end, mFileId);
+          task.readLock(0);
+          return mCacheContext.getKeyFromBegin(begin, end, mFileId, task);
         } else if (right >= BUCKET_LENGTH) {
-          mLockManager.initBucketLock(mFileId, BUCKET_LENGTH - 1);
-          return ClientCacheContext.INSTANCE.getKeyByReverse2(begin, end, mFileId, BUCKET_LENGTH - 1);
-        } else if (mCacheIndex0[right] != null && mCacheIndex0[right].mUnitNum > 0) {
-          CacheInternalUnit before = mCacheIndex0[right].mStart.before;
-          Iterator<CacheInternalUnit> iter = new TmpIterator<>(mCacheIndex0[right].mStart, null);
-          CacheUnit unit = ClientCacheContext.INSTANCE.getKey(begin, end, mFileId, iter, right);
-          if (unit.isFinish()) return unit;
-          TempCacheUnit tmp = (TempCacheUnit) unit;
-          if (before != null && tmp.getBegin() < before.getEnd()) {
-            return ClientCacheContext.INSTANCE.handleRightCoincidence(tmp, before, true, index);
-          } else {
-            return tmp;
+          task.readLock(BUCKET_LENGTH - 1);
+          return mCacheContext.getKeyByReverse2(begin, end, mFileId, BUCKET_LENGTH - 1, task);
+        } else {
+          task.readLock(right);
+          if (mCacheIndex0[right] != null && mCacheIndex0[right].mUnitNum > 0) {
+            CacheInternalUnit before = mCacheIndex0[right].mStart.before;
+            Iterator<CacheInternalUnit> iter = new TmpIterator<>(mCacheIndex0[right].mStart, null);
+            CacheUnit unit = mCacheContext.getKey(begin, end, mFileId, iter, right, task);
+            if (unit.isFinish()) return unit;
+            TempCacheUnit tmp = (TempCacheUnit) unit;
+            if (before != null && tmp.getBegin() < before.getEnd()) {
+              return mCacheContext.handleRightCoincidence(tmp, before, true, index, task);
+            } else {
+              return tmp;
+            }
           }
-        } else if (mCacheIndex0[left] != null && mCacheIndex0[left].mUnitNum > 0) {
-          CacheInternalUnit after = mCacheIndex0[left].mEnd.after;
-          PreviousIterator<CacheInternalUnit> iter = new TmpIterator<>(null, mCacheIndex0[left].mEnd);
-          CacheUnit unit = ClientCacheContext.INSTANCE.getKeyByReverse(begin, end, mFileId, iter, left);
-          if (unit.isFinish()) return unit;
-          TempCacheUnit tmp = (TempCacheUnit) unit;
-          if (after != null && tmp.getEnd() > after.getBegin()) {
-            return ClientCacheContext.INSTANCE.handleLeftCoincidence(after, tmp, true, index);
-          } else {
-            return tmp;
+          task.readUnlock(right);
+          task.readLock(left);
+          if (mCacheIndex0[left] != null && mCacheIndex0[left].mUnitNum > 0){
+            task.readUnlock(right);
+            CacheInternalUnit after = mCacheIndex0[left].mEnd.after;
+            PreviousIterator<CacheInternalUnit> iter = new TmpIterator<>(null, mCacheIndex0[left].mEnd);
+            CacheUnit unit = mCacheContext.getKeyByReverse(begin, end, mFileId, iter, left, task);
+            if (unit.isFinish()) return unit;
+            TempCacheUnit tmp = (TempCacheUnit) unit;
+            if (after != null && tmp.getEnd() > after.getBegin()) {
+              return mCacheContext.handleLeftCoincidence(after, tmp, true, index, task);
+            } else {
+              return tmp;
+            }
           }
+          task.readUnlock(left);
         }
       }
     }
-    return bucket.find(begin, end);
+    return bucket.find(begin, end, task);
   }
 
   public void print() {
@@ -156,48 +188,46 @@ public class LinkedFileBucket {
     }
 
     private void test1(CacheInternalUnit unit) {
-      if (test(unit)) {
+      CacheInternalUnit uu = test(unit);
+      if (uu != null) {
         System.out.println(unit);
         mCacheIndex1.print();
         throw new RuntimeException();
       }
     }
 
-    private boolean test(CacheInternalUnit unit) {
+    private CacheInternalUnit test(CacheInternalUnit unit) {
       CacheInternalUnit x = (CacheInternalUnit) mCacheIndex1.mRoot;
       long begin = unit.getBegin();
       long end = unit.getEnd();
       while (x != null) {
         if (begin >= x.getBegin() && end <= x.getEnd()) {
-          return true;
-
+          return x;
         } else if (begin >= x.getEnd()) {
           if (x.right != null) {
             x = x.right;
           } else {
-            return false;
-
+            return null;
           }
         } else if (end <= x.getBegin()) {
           if (x.left != null) {
             x = x.left;
           } else {
-            return false;
-
+            return null;
           }
         } else {
-          return false;
-
+          return null;
         }
       }
-      return false;
+      return null;
     }
 
     @Override
     public void deleteInIndex(CacheInternalUnit unit) {
       mCacheIndex1.remove(unit);
       unit.clearTreeIndex();
-      test1(unit);
+      // TODO make the test function running as async thread
+      // test1(unit);
     }
 
     @Override
@@ -209,9 +239,9 @@ public class LinkedFileBucket {
     }
 
     @Override
-    public CacheUnit findByIndex(long begin, long end) {
+    public CacheUnit findByIndex(long begin, long end, LockTask task) {
       int index = getIndex(begin, end);
-      return ClientCacheContext.INSTANCE.getKeyByTree(begin, end, mCacheIndex1, mFileId, index);
+      return mCacheContext.getKeyByTree(begin, end, mCacheIndex1, mFileId, index, task);
     }
 
     @Override
@@ -242,30 +272,34 @@ public class LinkedFileBucket {
       mIndex = index;
     }
 
+    public void lockCurrentBucket() {
+
+    }
+
     public abstract void convert(CacheInternalUnit unit, int num);
 
     public abstract void addToIndex(CacheInternalUnit unit);
 
-    public abstract CacheUnit findByIndex(long begin, long end);
+    public abstract CacheUnit findByIndex(long begin, long end, LockTask task);
 
     public abstract void deleteInIndex(CacheInternalUnit unit);
 
     public abstract void clearIndex();
 
     private void deleteInBucket(CacheInternalUnit unit) {
-      if (mUnitNum == 1) {
+      if (mUnitNum == 0) {
         mStart = mEnd = null;
         return;
       }
       if (unit.equals(mStart)) {
-        if (mUnitNum > 1) {
+        if (mUnitNum > 0) {
           mStart = mStart.after;
         } else {
           mStart = null;
         }
       }
       if (unit.equals(mEnd)) {
-        if (mUnitNum > 1) {
+        if (mUnitNum > 0) {
           mEnd = mEnd.before;
         } else {
           mEnd = null;
@@ -273,9 +307,9 @@ public class LinkedFileBucket {
       }
     }
 
-    public synchronized void delete(CacheInternalUnit unit) {
-      deleteInBucket(unit);
+    public void delete(CacheInternalUnit unit) {
       mUnitNum--;
+      deleteInBucket(unit);
       if (mConvertBefore) {
         if (mIsRserveIndex) {
           deleteInIndex(unit);
@@ -288,22 +322,35 @@ public class LinkedFileBucket {
           }
         }
       }
+
     }
 
-    public synchronized void addNew(CacheInternalUnit unit) {
+    public void addNew(CacheInternalUnit unit) {
       //TODO judge adding lock or not, because add index will happened after
       // lock bucke index, so maybe no need to lock bucket.
       mUnitNum++;
       if (mUnitNum == 1) {
         mStart = mEnd = unit;
-      } else if (mStart == null) {
-        mStart = unit;
       } else {
-        if (unit.getBegin() <= mStart.getBegin()) {
+        if (mStart == null) {
           mStart = unit;
+        } else {
+          if (IS_REVERT && unit.getEnd() < mStart.getEnd()) {
+            mStart = unit;
+          }
+          if (!IS_REVERT && unit.getBegin() < mStart.getBegin()) {
+            mStart = unit;
+          }
         }
-        if (unit.getBegin() >= mEnd.getBegin()) {
+        if (mEnd == null) {
           mEnd = unit;
+        } else {
+          if (IS_REVERT && unit.getEnd() > mEnd.getEnd()) {
+            mEnd = unit;
+          }
+          if (!IS_REVERT && unit.getBegin() > mEnd.getBegin()) {
+            mEnd = unit;
+          }
         }
       }
 
@@ -313,22 +360,26 @@ public class LinkedFileBucket {
       } else if (mConvertBefore) {
         addToIndex(unit);
       }
-
     }
 
-    public CacheUnit find(long begin, long end) {
+    public CacheUnit find(long begin, long end, LockTask task) {
       if (mUnitNum > CONVERT_LENGTH) {
-        return findByIndex(begin, end);
+        return findByIndex(begin, end, task);
       } else {
         TmpIterator<CacheInternalUnit> iter;
         if (IS_REVERT) {
           iter = new TmpIterator<>(null, mEnd);
-          return ClientCacheContext.INSTANCE.getKeyByReverse(begin, end, mFileId, iter, mIndex);
+          return mCacheContext.getKeyByReverse(begin, end, mFileId, iter, mIndex, task);
         } else {
-
           iter = new TmpIterator<>(mStart, null);
-          return ClientCacheContext.INSTANCE.getKey(begin, end, mFileId, iter, mIndex);
+          return mCacheContext.getKey(begin, end, mFileId, iter, mIndex, task);
         }
+      }
+    }
+
+    public void test() {
+      if (mStart == null || mEnd == null) {
+        if (mUnitNum > 0) throw new RuntimeException();
       }
     }
   }

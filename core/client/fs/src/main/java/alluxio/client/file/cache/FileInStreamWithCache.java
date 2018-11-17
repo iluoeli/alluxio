@@ -17,8 +17,12 @@ import alluxio.client.file.URIStatus;
 import alluxio.client.file.options.InStreamOptions;
 import alluxio.exception.PreconditionMessage;
 import com.google.common.base.Preconditions;
+import org.omg.Messaging.SYNC_WITH_TRANSPORT;
 
 import java.io.IOException;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
 
 import static alluxio.client.file.cache.ClientCacheContext.*;
 
@@ -39,9 +43,6 @@ public class FileInStreamWithCache extends FileInStream {
     mFileId = status.getFileId();
     fileId = mFileId;
     mLockManager = mCacheContext.getLockManager();
-  }
-
-  public void allowCache() {
 
   }
 
@@ -69,55 +70,80 @@ public class FileInStreamWithCache extends FileInStream {
     return res;
   }
 
-
   protected int read0(long pos, byte[] b, int off, int len) throws IOException {
-    boolean isPosition = false;
-    if (pos != mPosition) {
-      isPosition = true;
-    }
-    long length = mLength;
-    if (pos < 0 || pos >= length) {
-      return -1;
-    }
-    int res;
+    mReadLockList1.clear();
+    mREadUnlockList1.clear();
+    try {
+      boolean isPosition = false;
+      if (pos != mPosition) {
+        isPosition = true;
+      }
+      long length = mLength;
+      if (pos < 0 || pos >= length) {
+        return -1;
+      }
+      int res;
 
-    if (len == 0) {
-      return 0;
-    } else if (pos == mLength) { // at end of file
-      return -1;
-    }
-    if (mLockManager.evictCheck()) {
-      try {
-        CacheUnit unit = mCacheContext.getCache(mFileId, mLength, pos, Math.min(pos + len, mLength));
-        if (unit.isFinish()) {
-          if (pos < unit.getBegin()) {
-            throw new RuntimeException(pos + " " + (pos + len) + unit);
+      if (len == 0) {
+        return 0;
+      } else if (pos == mLength) { // at end of file
+        return -1;
+      }
+      if (mLockManager.evictCheck()) {
+        try {
+          LockTask task = new LockTask(mLockManager, mFileId);
+          CacheUnit unit = mCacheContext.getCache(mFileId, mLength, pos, Math.min(pos + len,
+            mLength), task);
+          unit.setLockTask(task);
+          if (unit.isFinish()) {
+            if (pos < unit.getBegin()) {
+              System.out.println(((CacheInternalUnit) unit).mTestName);
+              throw new RuntimeException(pos + " " + (pos + len) + unit);
+            }
+            int remaining = mCachePolicy.read((CacheInternalUnit) unit, b, off, pos, len);
+            if (!isPosition) {
+              mPosition += remaining;
+            }
+            return remaining;
+          } else {
+            TempCacheUnit tmpUnit = (TempCacheUnit) unit;
+            tmpUnit.setInStream(this);
+            try {
+              res = mCachePolicy.read(tmpUnit, b, off, len, pos, mCacheContext.isAllowCache());
+            } catch (Exception e) {
+              throw new RuntimeException(e);
+            }
+            if (res != len) {
+              // the end of file
+              tmpUnit.resetEnd((int) mLength);
+            }
           }
-          int remaining = mCachePolicy.read((CacheInternalUnit) unit, b, off, pos, len);
-          if (!isPosition) {
-            mPosition += remaining;
-          }
-          return remaining;
-        } else {
-          TempCacheUnit tmpUnit = (TempCacheUnit) unit;
-          tmpUnit.setInStream(this);
-          res = mCachePolicy.read(tmpUnit, b, off, len, pos, mCacheContext.isAllowCache());
-          if (res != len) {
-            // the end of file
-            tmpUnit.resetEnd((int) mLength);
-          }
+        } finally {
+          mLockManager.evictReadUnlock();
         }
-      } finally {
-        mLockManager.evictReadUnlock();
-      }
-    } else {
-      if (isPosition) {
-        res = innerPositionRead(pos, b, off, len);
       } else {
-        res = innerRead(b, off, len);
+        if (isPosition) {
+          res = innerPositionRead(pos, b, off, len);
+        } else {
+          res = innerRead(b, off, len);
+        }
+      }
+      return res;
+    } finally {
+      for (int i : mReadLockList1) {
+        if (!mREadUnlockList1.contains(i)) {
+          for (int j : mReadLockList1) {
+            System.out.print(j + " . ");
+          }
+          System.out.println();
+          for (int j : mREadUnlockList1) {
+            System.out.print(j + " ");
+          }
+          System.out.println();
+          throw new RuntimeException();
+        }
       }
     }
-    return res;
   }
 
   @Override
@@ -141,7 +167,9 @@ public class FileInStreamWithCache extends FileInStream {
       return -1;
     }
     long pos = mPosition;
-    CacheUnit unit = mCacheContext.getCache(mFileId, mLength, pos, Math.min(pos + len, pos + (int) (mLength - mPosition)));
+    LockTask task = new LockTask(mLockManager, mFileId);
+    CacheUnit unit = mCacheContext.getCache(mFileId, mLength, pos, Math.min(pos + len, pos +
+      (int) (mLength - mPosition)), task);
     if (unit.isFinish()) {
       int remaining = ((CacheInternalUnit) unit).positionedRead(b, off, pos, len);
       if (remaining > 0) mPosition += remaining;

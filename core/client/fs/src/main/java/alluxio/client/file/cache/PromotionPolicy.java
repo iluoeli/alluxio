@@ -7,10 +7,10 @@ import alluxio.client.file.cache.submodularLib.cacheSet.CacheSetUtils;
 import alluxio.client.file.cache.submodularLib.cacheSet.GR;
 import alluxio.exception.AlluxioException;
 
+import javax.swing.event.CaretListener;
 import java.io.IOException;
 import java.util.*;
 
-import static alluxio.client.file.cache.ClientCacheContext.fileId;
 import static alluxio.client.file.cache.ClientCacheContext.mPromotionThreadId;
 
 public class PromotionPolicy implements Runnable {
@@ -52,12 +52,19 @@ public class PromotionPolicy implements Runnable {
     return s1;
   }
 
+
   public void filter(BaseCacheUnit unit1) {
     synchronized (mAccessLock) {
       if (useOne) {
+        if (mSize > 2500) {
+          mInputSpace1.clear();
+        }
         mInputSpace1.add(unit1);
         mInputSpace1.addSort(unit1);
       } else {
+        if (mSize > 2000) {
+          mInputSpace2.clear();
+        }
         mInputSpace2.add(unit1);
         mInputSpace2.addSort(unit1);
       }
@@ -66,14 +73,17 @@ public class PromotionPolicy implements Runnable {
 
   }
 
-  public void promote() {
-    System.out.println("start promote");
+  public void update() {
+    System.out.println("start update");
     isProtomoting = true;
     synchronized (mAccessLock) {
       if (useOne) {
         mOptimizer.addInputSpace(mInputSpace1);
+        System.out.println(mInputSpace1.size());
       } else {
         mOptimizer.addInputSpace(mInputSpace2);
+        System.out.println(mInputSpace2.size());
+
       }
       useOne = !useOne;
     }
@@ -85,11 +95,12 @@ public class PromotionPolicy implements Runnable {
     }
     try {
       result.convertSort();
+      //System.out.println("result: " + result.size());
       mContext.merge(result);
     } catch (IOException | AlluxioException e) {
-      e.printStackTrace();
+      throw new RuntimeException(e);
     }
-    System.out.println("promote finish");
+    System.out.println("update finish");
 
   }
 
@@ -110,6 +121,7 @@ public class PromotionPolicy implements Runnable {
     mContext.COMPUTE_POOL.submit(this);
   }
 
+
   @Override
   public void run() {
     mPromotionThreadId = Thread.currentThread().getId();
@@ -117,13 +129,13 @@ public class PromotionPolicy implements Runnable {
     while (true) {
       try {
         if (promoteCheck()) {
-          promote();
+          update();
         }
       } catch (Exception e) {
         e.printStackTrace();
       } finally {
         try {
-          Thread.sleep(10);
+          Thread.sleep(1000);
         } catch (InterruptedException e) {
           throw new RuntimeException(e);
         }

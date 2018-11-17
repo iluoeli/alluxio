@@ -36,8 +36,11 @@ public class CacheInternalUnit extends LinkNode<CacheInternalUnit> implements Ca
     }
   }));
   public Queue<Set<BaseCacheUnit>> mTmpSplitQueue = null;
-  public volatile int readLock;
-  public int mBucketIndex = -1;
+
+  public int mBucketIndex = 0;
+  public String mTestName;
+  private LockTask mLockTask;
+
 
   public long getSize() {
     return mSize;
@@ -60,12 +63,22 @@ public class CacheInternalUnit extends LinkNode<CacheInternalUnit> implements Ca
   }
 
   public CacheInternalUnit(long begin, long end, long fileId, List<ByteBuf> data) {
+    Preconditions.checkArgument(data.size() > 0);
     mBegin = begin;
     mEnd = end;
     mData = data;
     mFileId = fileId;
     mSize = mEnd - mBegin;
   }
+
+  public LockTask getLockTask() {
+    return mLockTask;
+  }
+
+  public void setLockTask(LockTask task) {
+    mLockTask = task;
+  }
+
 
   @Override
   public void setCurrentHitVal(double hitValue) {
@@ -105,7 +118,7 @@ public class CacheInternalUnit extends LinkNode<CacheInternalUnit> implements Ca
    * @return
    */
   public int positionedRead(byte[] b, int off, long begin, int len) {
-    Preconditions.checkArgument(begin >= mBegin);
+    Preconditions.checkArgument(begin >= mBegin );
     Preconditions.checkArgument(mData.size() > 0);
     if (begin >= mEnd) {
       return -1;
@@ -205,8 +218,8 @@ public class CacheInternalUnit extends LinkNode<CacheInternalUnit> implements Ca
     if (lastRemain > 0 && lastRemain <= newbegin - begin) {
       begin += lastRemain;
       ByteBuf needDelete = mData.remove(0);
-      ReferenceCountUtil.release(needDelete);
-
+      //ReferenceCountUtil.release(needDelete);
+      ClientCacheContext.mAllocator.release(needDelete);
     } else if (lastRemain > newbegin - begin) {
       return lastRemain - (int) (newbegin - begin);
     }
@@ -216,7 +229,9 @@ public class CacheInternalUnit extends LinkNode<CacheInternalUnit> implements Ca
       if (begin > newbegin) {
         return (int) (begin - newbegin);
       } else {
-        mData.remove(i);
+        ByteBuf buf1 = mData.remove(i);
+        ClientCacheContext.mAllocator.release(buf1);
+        //ReferenceCountUtil.release(buf1);
       }
     }
     return 0;
@@ -241,9 +256,10 @@ public class CacheInternalUnit extends LinkNode<CacheInternalUnit> implements Ca
           buf.readerIndex(buf.capacity() - lastRemain);
           ByteBuf newBuf = buf.slice();
           //ByteBuf newBuf = buf.copy(buf.readerIndex(), buf.readableBytes());
-          ReferenceCountUtil.release(buf);
-          //buf.clear();
           mData.remove(0);
+          //ClientCacheContext.mAllocator.release(buf);
+
+          //buf.clear();
           newUnit.mData.add(newBuf);
           start += lastRemain;
         } else {
@@ -267,8 +283,7 @@ public class CacheInternalUnit extends LinkNode<CacheInternalUnit> implements Ca
         } else {
           ByteBuf newBuf = tmp.slice(0, (int) (newEnd - start));
           //ByteBuf newBuf = tmp.copy(0, (int) (newEnd - start));
-
-          //newUnit.mData.add(newBuf);
+          newUnit.mData.add(newBuf);
           //ReferenceCountUtil.release(tmp);
           return len - (int) (newEnd - start);
         }
@@ -308,9 +323,7 @@ public class CacheInternalUnit extends LinkNode<CacheInternalUnit> implements Ca
           ClientCacheContext.INSTANCE.getGhostCache().add(new BaseCacheUnit(lastEnd, begin, mFileId));
         }
       }
-
       lastByteRemain = generateSubCacheUnit(begin, end, lastByteRemain, bucket, res);
-
       lastEnd = end;
     }
     if (lastEnd != mEnd) {
@@ -328,10 +341,11 @@ public class CacheInternalUnit extends LinkNode<CacheInternalUnit> implements Ca
   }
 
   public void clearData() {
-    for (ByteBuf b : mData) {
-      ReferenceCountUtil.release(b);
+    //for (ByteBuf b : mData) {
+    //  ReferenceCountUtil.release(b);
       //b.clear();
       //b = null;
-    }
+    //}
+   ClientCacheContext.mAllocator.release(mData);
   }
 }

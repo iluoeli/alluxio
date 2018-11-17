@@ -31,13 +31,13 @@ public class CacheFileSystem extends BaseFileSystem {
   private static MetedataCache metedataCache;
 
   public static CacheFileSystem get(FileSystemContext context, ClientCacheContext cacheContext) {
-		metedataCache =  cacheContext.metedataCache;
-		return new CacheFileSystem(context, cacheContext);
+    metedataCache = cacheContext.getMetedataCache();
+    return new CacheFileSystem(context, cacheContext);
   }
 
   public static CacheFileSystem get() {
-  	return get(FileSystemContext.get(), ClientCacheContext.INSTANCE);
-	}
+    return get(FileSystemContext.get(), ClientCacheContext.INSTANCE);
+  }
 
   private CacheFileSystem(FileSystemContext context, ClientCacheContext cacheContext) {
     super(context);
@@ -46,7 +46,7 @@ public class CacheFileSystem extends BaseFileSystem {
 
   @Override
   public FileInStream openFile(AlluxioURI path) throws IOException, AlluxioException {
-    if(!useMetedata)
+    if (!useMetedata)
       return openFile(path, OpenFileOptions.defaults());
     else
       return openFileWithCache(path);
@@ -54,30 +54,30 @@ public class CacheFileSystem extends BaseFileSystem {
 
   @Override
   public FileInStream openFile(AlluxioURI path, OpenFileOptions options) throws IOException, AlluxioException {
-  	URIStatus status = getStatus(path);
-		if (status.isFolder()) {
-			throw new FileDoesNotExistException(
-				ExceptionMessage.CANNOT_READ_DIRECTORY.getMessage(status.getName()));
-		}
-		InStreamOptions inStreamOptions = options.toInStreamOptions(status);
-		FileInStream in = new FileInStream(status, inStreamOptions, mFileSystemContext);
+    URIStatus status = getStatus(path);
+    if (status.isFolder()) {
+      throw new FileDoesNotExistException(
+        ExceptionMessage.CANNOT_READ_DIRECTORY.getMessage(status.getName()));
+    }
+    InStreamOptions inStreamOptions = options.toInStreamOptions(status);
+    FileInStream in = new FileInStream(status, inStreamOptions, mFileSystemContext);
     return new FileInStreamWithCache(inStreamOptions, mCacheContext, status);
   }
 
-	public FileInStream openFileWithCache(AlluxioURI path) throws IOException, AlluxioException {
-		URIStatus status;
-		if(!metedataCache.cached(path)) {
-			status = getStatus(path);
-			metedataCache.cacheMetedata(path, status);
-		} else {
-			status = metedataCache.getStatus(path);
-		}
-		if (status.isFolder()) {
-			throw new FileDoesNotExistException(
-				ExceptionMessage.CANNOT_READ_DIRECTORY.getMessage(status.getName()));
-		}
+  public FileInStream openFileWithCache(AlluxioURI path) throws IOException, AlluxioException {
+    URIStatus status;
+    if (!metedataCache.cached(path)) {
+      status = getStatus(path);
+      metedataCache.cacheMetedata(path, status);
+    } else {
+      status = metedataCache.getStatus(path);
+    }
+    if (status.isFolder()) {
+      throw new FileDoesNotExistException(
+        ExceptionMessage.CANNOT_READ_DIRECTORY.getMessage(status.getName()));
+    }
 
-		InStreamOptions inStreamOptions = OpenFileOptions.defaults().toInStreamOptions(status);
-		return new FileInStreamWithCache(inStreamOptions, mCacheContext, status);
-	}
+    InStreamOptions inStreamOptions = OpenFileOptions.defaults().toInStreamOptions(status);
+    return new FileInStreamWithCache(inStreamOptions, mCacheContext, status);
+  }
 }
