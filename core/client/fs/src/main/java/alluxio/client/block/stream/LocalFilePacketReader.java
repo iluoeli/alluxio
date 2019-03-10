@@ -13,6 +13,7 @@ package alluxio.client.block.stream;
 
 import alluxio.Configuration;
 import alluxio.PropertyKey;
+import alluxio.client.file.FileInStream;
 import alluxio.client.file.FileSystemContext;
 import alluxio.client.file.options.InStreamOptions;
 import alluxio.metrics.ClientMetrics;
@@ -31,6 +32,7 @@ import io.netty.channel.Channel;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.concurrent.ConcurrentHashMap;
 
 import javax.annotation.concurrent.NotThreadSafe;
 
@@ -45,6 +47,8 @@ public final class LocalFilePacketReader implements PacketReader {
   private final long mPacketSize;
   private long mPos;
   private boolean mClosed;
+  public static ConcurrentHashMap<Long, Long> rpcTime = new ConcurrentHashMap();
+
 
   /**
    * Creates an instance of {@link LocalFilePacketReader}.
@@ -117,20 +121,23 @@ public final class LocalFilePacketReader implements PacketReader {
      */
     public Factory(FileSystemContext context, WorkerNetAddress address, long blockId,
         long packetSize, InStreamOptions options) throws IOException {
+
       mContext = context;
       mAddress = address;
       mBlockId = blockId;
       mPacketSize = packetSize;
-
       mChannel = context.acquireNettyChannel(address);
       Protocol.LocalBlockOpenRequest request =
           Protocol.LocalBlockOpenRequest.newBuilder().setBlockId(mBlockId)
               .setPromote(options.getOptions().getReadType().isPromote()).build();
       try {
+        long begin = System.currentTimeMillis();
         ProtoMessage message = NettyRPC
             .call(NettyRPCContext.defaults().setChannel(mChannel).setTimeout(READ_TIMEOUT_MS),
                 new ProtoMessage(request));
         Preconditions.checkState(message.isLocalBlockOpenResponse());
+        rpcTime.put(Thread.currentThread().getId(), rpcTime.getOrDefault(Thread.currentThread()
+          .getId(),0l) + (System.currentTimeMillis() - begin));
         mPath = message.asLocalBlockOpenResponse().getPath();
       } catch (Exception e) {
         context.releaseNettyChannel(address, mChannel);

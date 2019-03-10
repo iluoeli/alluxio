@@ -25,7 +25,10 @@
   <modules>
     <module>fs</module>
     <module>hdfs</module>
+    <module>formatfs</module>
+
     <module>runtime</module>
+
   </modules>
 
   <properties>

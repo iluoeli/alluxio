@@ -1,0 +1,100 @@
+
+
+  /*
+  private Server mCacheServer;
+  private ClientCacheContext mCacheContext;
+  private int mPort;
+  private String mHost;
+
+  public CacheServer(int port) {
+    try {
+      mCacheServer = ServerBuilder.forPort(port).
+        addService(new CacheService()).build();
+      mCacheServer.start();
+      mPort = port;
+      mHost = InetAddress.getLocalHost().getHostAddress();
+      mCacheContext = ClientCacheContext.INSTANCE;
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    }
+  }
+
+  public int getPort() {
+    return mPort;
+  }
+
+  public String getHost() {
+    return mHost;
+  }
+
+  private class CacheService extends DataServiceGrpc.DataServiceImplBase {
+    @Override
+    public void requestData(DataRequest request, final StreamObserver<Data> dataStreamObserver) {
+      OnlyReadLockTask remoteTask = new OnlyReadLockTask(mCacheContext.getLockManager());
+      try {
+        long fileId = request.getFileId();
+        long begin = request.getBegin();
+        long end = request.getEnd();
+        long fileLength = mCacheContext.getMetedataCache().getFileLength(request.getFileId());
+        CacheUnit unit = mCacheContext.getCache(request.getFileId(), fileLength, request.getBegin(), request.getEnd(), remoteTask);
+        if (!unit.isFinish()) {
+          TempCacheUnit unit1 = (TempCacheUnit) unit;
+
+          unit1.cache(begin, (int) (end - begin), mCacheContext.mFileIdToInternalList.get(fileId));
+
+        }
+
+        List<ByteBuf> res = unit.getAllData();
+        for (ByteBuf tmpData : res) {
+          dataStreamObserver.onNext(mCacheContext.convertData(tmpData));
+        }
+        dataStreamObserver.onCompleted();
+      } catch (Exception e) {
+        throw new RuntimeException(e);
+      } finally {
+        remoteTask.unlockAllReadLocks();
+      }
+    }
+  }
+  }
+  */
+
+
+
+
+  /*
+  private final ManagedChannel channel;
+  private final DataServiceGrpc.DataServiceBlockingStub blockingStub;
+  private MemoryAllocator memoryAllocator;
+
+  public CacheClient(String host, int port,  MemoryAllocator allocator) {
+    this(ManagedChannelBuilder.forAddress(host, port)
+      .usePlaintext()
+      .build());
+    memoryAllocator = allocator;
+  }
+
+  CacheClient(ManagedChannel channel) {
+    this.channel = channel;
+    blockingStub = DataServiceGrpc.newBlockingStub(channel);
+  }
+
+  public void shutdown() throws InterruptedException {
+    channel.shutdown().awaitTermination(5, TimeUnit.SECONDS);
+  }
+
+  public List<ByteString> getDataFromRemote(long fileId, long begin, long end) {
+    DataRequest request = DataRequest.newBuilder().setFileId(fileId).setBegin(begin)
+      .setEnd(end).build();
+    Iterator<Data> dataIterator = blockingStub.requestData(request);
+    List<ByteString> res = new ArrayList<>();
+    try {
+      while (dataIterator.hasNext()) {
+        Data currData = dataIterator.next();
+        res.add(currData.getData());
+      }
+    } catch (StatusRuntimeException e) {
+      //TODO handle exception
+    }
+    return res;
+  }*/

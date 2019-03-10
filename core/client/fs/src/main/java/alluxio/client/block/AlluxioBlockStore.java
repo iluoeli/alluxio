@@ -20,6 +20,7 @@ import alluxio.client.block.policy.options.GetWorkerOptions;
 import alluxio.client.block.stream.BlockInStream;
 import alluxio.client.block.stream.BlockInStream.BlockInStreamSource;
 import alluxio.client.block.stream.BlockOutStream;
+import alluxio.client.file.FileInStream;
 import alluxio.client.file.FileSystemContext;
 import alluxio.client.file.options.InStreamOptions;
 import alluxio.client.file.options.OutStreamOptions;
@@ -30,6 +31,7 @@ import alluxio.exception.status.NotFoundException;
 import alluxio.exception.status.ResourceExhaustedException;
 import alluxio.exception.status.UnavailableException;
 import alluxio.network.TieredIdentityFactory;
+import alluxio.network.netty.NettyRPC;
 import alluxio.resource.CloseableResource;
 import alluxio.util.FormatUtils;
 import alluxio.wire.BlockInfo;
@@ -154,10 +156,13 @@ public final class AlluxioBlockStore {
       Map<WorkerNetAddress, Long> failedWorkers) throws IOException {
     // Get the latest block info from master
     BlockInfo info;
+    long begin = System.currentTimeMillis();
     try (CloseableResource<BlockMasterClient> masterClientResource =
              mContext.acquireBlockMasterClientResource()) {
       info = masterClientResource.get().getBlockInfo(blockId);
     }
+    FileInStream.mGetBlockInfoTime += System.currentTimeMillis() - begin;
+
     List<BlockLocation> locations = info.getLocations();
     List<BlockWorkerInfo> blockWorkerInfo = Collections.EMPTY_LIST;
     // Initial target workers to read the block given the block locations.
@@ -212,7 +217,9 @@ public final class AlluxioBlockStore {
     if (dataSource == null) {
       throw new UnavailableException(ExceptionMessage.NO_WORKER_AVAILABLE.getMessage());
     }
-    return BlockInStream.create(mContext, info, dataSource, dataSourceType, options);
+    //return BlockInStream.create(mContext, info, dataSource, dataSourceType, options, info
+     /// .getLocations().get(0).getTierAlias().equals("MEM"));
+    return BlockInStream.create(mContext, info, dataSource, dataSourceType, options, false);
   }
 
   private Set<WorkerNetAddress> handleFailedWorkers(Set<WorkerNetAddress> workers,

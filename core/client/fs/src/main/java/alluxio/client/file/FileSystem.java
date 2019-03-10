@@ -15,7 +15,6 @@ import alluxio.AlluxioURI;
 import alluxio.Configuration;
 import alluxio.PropertyKey;
 import alluxio.annotation.PublicApi;
-import alluxio.client.file.cache.ClientCacheContext;
 import alluxio.client.file.options.CreateDirectoryOptions;
 import alluxio.client.file.options.CreateFileOptions;
 import alluxio.client.file.options.DeleteOptions;
@@ -86,18 +85,6 @@ public interface FileSystem {
       }
       return BaseFileSystem.get(context);
     }
-
-    public static FileSystem get(boolean useCache) {
-      if(useCache) {
-        return get(FileSystemContext.get(), ClientCacheContext.INSTANCE);
-      }
-      return get();
-    }
-
-    public static FileSystem get(FileSystemContext context, ClientCacheContext cacheContext) {
-      return CacheFileSystem.get(context, cacheContext);
-    }
-
   }
 
   /**

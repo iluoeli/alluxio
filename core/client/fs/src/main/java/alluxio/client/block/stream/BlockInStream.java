@@ -16,6 +16,7 @@ import alluxio.PropertyKey;
 import alluxio.Seekable;
 import alluxio.client.BoundedStream;
 import alluxio.client.PositionedReadable;
+import alluxio.client.file.FileInStream;
 import alluxio.client.file.FileSystemContext;
 import alluxio.client.file.URIStatus;
 import alluxio.client.file.options.InStreamOptions;
@@ -28,6 +29,7 @@ import alluxio.util.io.BufferUtils;
 import alluxio.util.network.NettyUtils;
 import alluxio.util.network.NetworkAddressUtils;
 import alluxio.wire.BlockInfo;
+import alluxio.wire.BlockLocation;
 import alluxio.wire.WorkerNetAddress;
 
 import com.google.common.base.Preconditions;
@@ -36,6 +38,7 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.concurrent.ConcurrentHashMap;
 
 import javax.annotation.concurrent.NotThreadSafe;
 
@@ -72,6 +75,8 @@ public class BlockInStream extends InputStream implements BoundedStream, Seekabl
 
   private boolean mClosed = false;
   private boolean mEOF = false;
+  public boolean mIsHit = false;
+  public static ConcurrentHashMap<Long, Long> mmapTime = new ConcurrentHashMap();
 
   /**
    * Creates a {@link BlockInStream}.
@@ -94,7 +99,8 @@ public class BlockInStream extends InputStream implements BoundedStream, Seekabl
    * @return the {@link BlockInStream} object
    */
   public static BlockInStream create(FileSystemContext context, BlockInfo info,
-      WorkerNetAddress dataSource, BlockInStreamSource dataSourceType, InStreamOptions options)
+      WorkerNetAddress dataSource, BlockInStreamSource dataSourceType, InStreamOptions options,
+                                     boolean isHit)
       throws IOException {
     URIStatus status = options.getStatus();
     OpenFileOptions readOptions = options.getOptions();
@@ -113,12 +119,12 @@ public class BlockInStream extends InputStream implements BoundedStream, Seekabl
     boolean shortCircuit = Configuration.getBoolean(PropertyKey.USER_SHORT_CIRCUIT_ENABLED);
     boolean sourceSupportsDomainSocket = NettyUtils.isDomainSocketSupported(dataSource);
     boolean sourceIsLocal = dataSourceType == BlockInStreamSource.LOCAL;
-
     // Short circuit
     if (sourceIsLocal && shortCircuit && !sourceSupportsDomainSocket) {
+
       LOG.debug("Creating short circuit input stream for block {} @ {}", blockId, dataSource);
       try {
-        return createLocalBlockInStream(context, dataSource, blockId, blockSize, options);
+        return createLocalBlockInStream(context, dataSource, blockId, blockSize, options, isHit);
       } catch (NotFoundException e) {
         // Failed to do short circuit read because the block is not available in Alluxio.
         // We will try to read via netty. So this exception is ignored.
@@ -131,7 +137,13 @@ public class BlockInStream extends InputStream implements BoundedStream, Seekabl
     LOG.debug("Creating netty input stream for block {} @ {} from client {} reading through {}",
         blockId, dataSource, NetworkAddressUtils.getClientHostName(), dataSource);
     return createNettyBlockInStream(context, dataSource, dataSourceType, builder.buildPartial(),
-        blockSize, options);
+        blockSize, options, isHit);
+  }
+
+  public static BlockInStream create(FileSystemContext context, BlockInfo info,
+                                     WorkerNetAddress dataSource, BlockInStreamSource dataSourceType, InStreamOptions options
+                                     ) {
+    return create(context, info, dataSource, dataSourceType,options);
   }
 
   /**
@@ -145,12 +157,13 @@ public class BlockInStream extends InputStream implements BoundedStream, Seekabl
    * @return the {@link BlockInStream} created
    */
   private static BlockInStream createLocalBlockInStream(FileSystemContext context,
-      WorkerNetAddress address, long blockId, long length, InStreamOptions options)
+      WorkerNetAddress address, long blockId, long length, InStreamOptions options, boolean isHit)
       throws IOException {
-    long packetSize = Configuration.getBytes(PropertyKey.USER_LOCAL_READER_PACKET_SIZE_BYTES);
-    return new BlockInStream(
+      long packetSize = Configuration.getBytes(PropertyKey.USER_LOCAL_READER_PACKET_SIZE_BYTES);
+      return new BlockInStream(
         new LocalFilePacketReader.Factory(context, address, blockId, packetSize, options),
-        address, BlockInStreamSource.LOCAL, blockId, length);
+        address, BlockInStreamSource.LOCAL, blockId, length, isHit);
+
   }
 
   /**
@@ -166,13 +179,14 @@ public class BlockInStream extends InputStream implements BoundedStream, Seekabl
    */
   private static BlockInStream createNettyBlockInStream(FileSystemContext context,
       WorkerNetAddress address, BlockInStreamSource blockSource,
-      Protocol.ReadRequest readRequestPartial, long blockSize, InStreamOptions options) {
+      Protocol.ReadRequest readRequestPartial, long blockSize, InStreamOptions options,
+                                                        boolean isHit) {
     long packetSize =
         Configuration.getBytes(PropertyKey.USER_NETWORK_NETTY_READER_PACKET_SIZE_BYTES);
     PacketReader.Factory factory = new NettyPacketReader.Factory(context, address,
         readRequestPartial.toBuilder().setPacketSize(packetSize).buildPartial());
     return new BlockInStream(factory, address, blockSource, readRequestPartial.getBlockId(),
-        blockSize);
+        blockSize, isHit);
   }
 
   /**
@@ -197,7 +211,7 @@ public class BlockInStream extends InputStream implements BoundedStream, Seekabl
         .setOpenUfsBlockOptions(ufsOptions).setPacketSize(packetSize).buildPartial();
     PacketReader.Factory factory = new NettyPacketReader.Factory(context, address,
         readRequest.toBuilder().buildPartial());
-    return new BlockInStream(factory, address, blockSource, blockId, blockSize);
+    return new BlockInStream(factory, address, blockSource, blockId, blockSize, false);
   }
 
   /**
@@ -210,7 +224,18 @@ public class BlockInStream extends InputStream implements BoundedStream, Seekabl
    * @param length the length
    */
   protected BlockInStream(PacketReader.Factory packetReaderFactory, WorkerNetAddress address,
-      BlockInStreamSource blockSource, long id, long length) {
+      BlockInStreamSource blockSource, long id, long length, boolean isHit) {
+    mPacketReaderFactory = packetReaderFactory;
+    mAddress = address;
+    mInStreamSource = blockSource;
+    mId = id;
+    mLength = length;
+    mIsHit = isHit;
+  }
+
+
+  protected BlockInStream(PacketReader.Factory packetReaderFactory, WorkerNetAddress address,
+                          BlockInStreamSource blockSource, long id, long length) {
     mPacketReaderFactory = packetReaderFactory;
     mAddress = address;
     mInStreamSource = blockSource;
@@ -260,7 +285,9 @@ public class BlockInStream extends InputStream implements BoundedStream, Seekabl
       return -1;
     }
     int toRead = Math.min(len, mCurrentPacket.readableBytes());
+    long begin = System.currentTimeMillis();
     mCurrentPacket.readBytes(b, off, toRead);
+    FileInStream.mReadTime += (System.currentTimeMillis() - begin);
     mPos += toRead;
     return toRead;
   }
@@ -287,7 +314,12 @@ public class BlockInStream extends InputStream implements BoundedStream, Seekabl
           }
           Preconditions.checkState(dataBuffer.readableBytes() <= len);
           int toRead = dataBuffer.readableBytes();
+          long begin = System.currentTimeMillis();
+          System.out.println(dataBuffer.readableBytes());
+
           dataBuffer.readBytes(b, off, toRead);
+          mmapTime.put(Thread.currentThread().getId(), mmapTime.getOrDefault(Thread.currentThread()
+            .getId(),0l) + (System.currentTimeMillis() - begin));
           len -= toRead;
           off += toRead;
         } finally {

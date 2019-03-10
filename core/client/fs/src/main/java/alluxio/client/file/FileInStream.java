@@ -16,6 +16,7 @@ import alluxio.PropertyKey;
 import alluxio.Seekable;
 import alluxio.annotation.PublicApi;
 import alluxio.client.BoundedStream;
+import alluxio.client.HitMetric;
 import alluxio.client.PositionedReadable;
 import alluxio.client.block.AlluxioBlockStore;
 import alluxio.client.block.stream.BlockInStream;
@@ -96,6 +97,25 @@ public class FileInStream extends InputStream implements BoundedStream, Position
    */
   private BlockInStream mBlockInStream;
 
+  public static long mGetPathTime = 0;
+  public static long mGetBlockInfoTime = 0;
+  public static long mReleaseTime = 0;
+  public static long mReadTime = 0;
+
+  public static void initmetric() {
+    mGetPathTime = 0;
+    mGetBlockInfoTime = 0;
+    mReleaseTime = 0;
+    mReadTime = 0;
+  }
+
+  public static void systemOut() {
+    System.out.println("get path time :" + mGetPathTime);
+    System.out.println("get block info time :" + mGetBlockInfoTime);
+    System.out.println("read time :" + mReadTime);
+    System.out.println("release time :" + mReleaseTime);
+  }
+
   /**
    * A map of worker addresses to the most recent epoch time when client fails to read from it.
    */
@@ -161,6 +181,7 @@ public class FileInStream extends InputStream implements BoundedStream, Position
 
   @Override
   public int read(byte[] b, int off, int len) throws IOException {
+    //System.out.println(off + " " + (off + len));
     Preconditions.checkArgument(b != null, PreconditionMessage.ERR_READ_BUFFER_NULL);
     Preconditions.checkArgument(off >= 0 && len >= 0 && len + off <= b.length,
       PreconditionMessage.ERR_BUFFER_STATE.toString(), b.length, off, len);
@@ -227,41 +248,53 @@ public class FileInStream extends InputStream implements BoundedStream, Position
   }
 
   private int positionedReadInternal(long pos, byte[] b, int off, int len) throws IOException {
-    if (pos < 0 || pos >= mLength) {
-      return -1;
-    }
+    try {
+      if (pos < 0 || pos >= mLength) {
+        return -1;
+      }
 
-    int lenCopy = len;
-    CountingRetry retry = new CountingRetry(MAX_WORKERS_TO_RETRY);
-    IOException lastException = null;
-    while (len > 0 && retry.attempt()) {
-      if (pos >= mLength) {
-        break;
+      int lenCopy = len;
+      CountingRetry retry = new CountingRetry(MAX_WORKERS_TO_RETRY);
+      IOException lastException = null;
+      while (len > 0 && retry.attempt()) {
+        if (pos >= mLength) {
+          break;
+        }
+        long blockId = mStatus.getBlockIds().get(Math.toIntExact(pos / mBlockSize));
+
+        BlockInStream stream = mBlockStore.getInStream(blockId, mOptions, mFailedWorkers);
+
+        try {
+          long offset = pos % mBlockSize;
+          long begin = System.currentTimeMillis();
+          int bytesRead =
+            stream.positionedRead(offset, b, off, (int) Math.min(mBlockSize - offset, len));
+          mReadTime += System.currentTimeMillis() - begin;
+          Preconditions.checkState(bytesRead > 0, "No data is read before EOF");
+          pos += bytesRead;
+          off += bytesRead;
+          len -= bytesRead;
+          retry.reset();
+          lastException = null;
+          if (stream.mIsHit) {
+            HitMetric.mHitSize += bytesRead;
+          } else {
+            HitMetric.mMissSize += bytesRead;
+          }
+        } catch (UnavailableException | DeadlineExceededException | ConnectException e) {
+          lastException = e;
+          handleRetryableException(stream, e);
+          stream = null;
+        } finally {
+          closeBlockInStream(stream);
+        }
       }
-      long blockId = mStatus.getBlockIds().get(Math.toIntExact(pos / mBlockSize));
-      BlockInStream stream = mBlockStore.getInStream(blockId, mOptions, mFailedWorkers);
-      try {
-        long offset = pos % mBlockSize;
-        int bytesRead =
-          stream.positionedRead(offset, b, off, (int) Math.min(mBlockSize - offset, len));
-        Preconditions.checkState(bytesRead > 0, "No data is read before EOF");
-        pos += bytesRead;
-        off += bytesRead;
-        len -= bytesRead;
-        retry.reset();
-        lastException = null;
-      } catch (UnavailableException | DeadlineExceededException | ConnectException e) {
-        lastException = e;
-        handleRetryableException(stream, e);
-        stream = null;
-      } finally {
-        closeBlockInStream(stream);
+      if (lastException != null) {
+        throw lastException;
       }
+      return lenCopy - len;
+    } finally {
     }
-    if (lastException != null) {
-      throw lastException;
-    }
-    return lenCopy - len;
   }
 
   /* Seekable methods */
