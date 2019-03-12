@@ -34,7 +34,7 @@ public class ESFEvictor extends MTLRUEvictor {
   }
 
   private double getHRDCost(double HRD, long userId) {
-    return (HRD) * 100 /( (double)actualEvictContext.get(userId).mCacheSize /  mBase );
+    return (HRD) * 100 / ((double)actualEvictContext.get(userId).mCacheSize / mBase);
   }
 
   public void evict() {
@@ -45,7 +45,7 @@ public class ESFEvictor extends MTLRUEvictor {
         double actualHitRatio = actualEvictContext.get(userId).computePartialHitRatio();
         double baseHitRatio = baseEvictCotext.get(userId).computePartialHitRatio();
         double HRDCost = getHRDCost(baseHitRatio - actualHitRatio, userId);
-        if (HRDCost < minHRDCost) {
+        if (HRDCost < minHRDCost ){
           minHRDCost = HRDCost;
           minCostUserId = userId;
         }
@@ -59,5 +59,4 @@ public class ESFEvictor extends MTLRUEvictor {
     ESFEvictor esfTest = new ESFEvictor(new ClientCacheContext(false));
     esfTest.test();
   }
-
 }

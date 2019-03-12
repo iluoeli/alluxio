@@ -67,20 +67,20 @@ public class MTLRUEvictor extends LRUEvictor {
       }
       boolean reverse = false;
       for (int j = 0; j < 3072; j ++) {
-        if (j % 3 == 0) {
+       // if (j % 3 == 0) {
           evictCheck();
-        }
-        int randomIndex = RandomUtils.nextInt(0, 3);
+       // }
+       // int randomIndex = RandomUtils.nextInt(0, 3);
         int tmp;
-        if (randomIndex == 0) {
+       // if (randomIndex == 0) {
           tmp = RandomUtils.nextInt(0, 1023);
-        } else if (randomIndex == 1) {
-          tmp = RandomUtils.nextInt(0, 512);
-        } else {
-          tmp = RandomUtils.nextInt(0, 256);
-        }
-        long userId = RandomUtils.nextInt(0, 3);
-
+       // } else if (randomIndex == 1) {
+       //   tmp = RandomUtils.nextInt(0, 512);
+        //} else {
+       //   tmp = RandomUtils.nextInt(0, 256);
+        //}
+        long userId = RandomUtils.nextInt(0, 4);
+        userId = userId % 3;
         long begin = 1024 * 1024 * tmp;
         long end = begin + 1024 * 1024;
         TmpCacheUnit unit = new TmpCacheUnit(mTestFileId, begin, end);

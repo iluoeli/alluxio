@@ -42,9 +42,6 @@ public class CacheServer {
   private int mPort;
   private ClientCacheContext mCacheContext;
   private ChannelHandler mChannelHandler;
-  public static final ByteBuf b = ByteBufAllocator.DEFAULT.buffer(10);
-  public static   FileSystem fs = CacheFileSystem.get(false);
-
 
   public CacheServer(String hostName, int port, ClientCacheContext cacheContext) {
     mHostname = hostName;
