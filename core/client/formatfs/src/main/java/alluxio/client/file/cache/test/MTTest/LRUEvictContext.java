@@ -5,6 +5,7 @@ import alluxio.client.file.cache.CacheUnit;
 import alluxio.client.file.cache.ClientCacheContext;
 import alluxio.client.file.cache.TempCacheUnit;
 import alluxio.client.file.cache.test.LRUEvictor;
+import com.google.common.base.Preconditions;
 
 import java.util.HashSet;
 import java.util.LinkedList;
@@ -12,7 +13,7 @@ import java.util.List;
 import java.util.Set;
 
 public class LRUEvictContext extends BaseEvictContext {
-  private LinkedList<TmpCacheUnit> mLRUList = new LinkedList<>();
+   LinkedList<TmpCacheUnit> mLRUList = new LinkedList<>();
   private Set<TmpCacheUnit> accessSet = new HashSet<>();
 
   public LRUEvictContext(LRUEvictor test, ClientCacheContext cacheContext) {
@@ -65,7 +66,7 @@ public class LRUEvictContext extends BaseEvictContext {
     return newSize;
   }
   public long remove(TmpCacheUnit deleteUnit) {
-    CacheUnit unit = mCacheContext.getCache(mTestFileId, mTestFileLength, deleteUnit.getBegin(),
+    CacheUnit unit = mCacheContext.getCache(deleteUnit.getFileId(), mTestFileLength, deleteUnit.getBegin(),
       deleteUnit.getEnd(), unlockTask);
     long res = 0;
     if (unit.isFinish()) {

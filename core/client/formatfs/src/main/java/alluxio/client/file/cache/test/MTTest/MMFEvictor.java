@@ -38,7 +38,6 @@ public class MMFEvictor extends MTLRUEvictor {
       }
       TmpCacheUnit unit = actualEvictContext.get(maxUserId).getEvictUnit();
       actualSize -= actualEvictContext.get(maxUserId).remove(unit);
-      System.out.println(actualSize / (1024 * 1024));
     }
   }
 

@@ -11,6 +11,7 @@
 
 package alluxio.client.file.cache;
 
+import alluxio.client.file.cache.Metric.HitRatioMetric;
 import alluxio.client.file.cache.struct.LinkNode;
 import alluxio.client.file.cache.struct.LongPair;
 import com.google.common.base.Preconditions;
@@ -203,9 +204,7 @@ public class CacheInternalUnit extends LinkNode<CacheInternalUnit> implements Ca
     if (begin > newBegin) {
       int currentLeftCanReadLen = current.capacity() - (int) (begin - newBegin);
       int readLen = Math.min(currentLeftCanReadLen, leftToRead);
-
       current.getBytes((int) (begin - newBegin), b, off, readLen);
-
       leftToRead -= readLen;
       readedLen += readLen;
       if (iter.hasNext()) {
@@ -215,9 +214,7 @@ public class CacheInternalUnit extends LinkNode<CacheInternalUnit> implements Ca
 
     while (leftToRead > 0) {
       int readLen = Math.min(current.capacity(), leftToRead);
-
       current.getBytes(0, b, off + readedLen, readLen);
-
       leftToRead -= readLen;
       readedLen += readLen;
       if (iter.hasNext()) {
@@ -226,7 +223,7 @@ public class CacheInternalUnit extends LinkNode<CacheInternalUnit> implements Ca
         break;
       }
     }
-
+    HitRatioMetric.INSTANCE.hitSize += readedLen;
     return readedLen;
   }
 

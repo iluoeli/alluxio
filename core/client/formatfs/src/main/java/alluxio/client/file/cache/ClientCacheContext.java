@@ -658,15 +658,15 @@ public class ClientCacheContext implements CacheContext {
 
     public void readLock(long fileId, int bucketIndex, String tag);
 
-    public void readUnlock(long fileId,int bucketIndex);
+    public void readUnlock(long fileId, int bucketIndex);
 
-    public void readLock( int beginIndex, int EndIndex, LockTask task);
+    public void readLock(int beginIndex, int EndIndex, LockTask task);
 
     public void writeUnlock(long fileId, int bucketIndex);
 
     public void writeLock(long fileId, int bucketIndex);
 
-    public void writeLock(int beginIndex, int EndIndex,  LockTask task);
+    public void writeLock(int beginIndex, int EndIndex, LockTask task);
 
     public boolean evictCheck();
 

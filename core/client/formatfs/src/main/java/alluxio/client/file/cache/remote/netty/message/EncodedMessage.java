@@ -4,7 +4,7 @@ import io.netty.buffer.ByteBuf;
 
 /**
  * This interface represents some type of message that can be encoded into
- * {@link io.netty.buffer.ByteBuf}.
+ * {@link ByteBuf}.
  */
 public interface EncodedMessage {
   /**

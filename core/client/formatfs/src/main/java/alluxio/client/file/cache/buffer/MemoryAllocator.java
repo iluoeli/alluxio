@@ -36,10 +36,10 @@ public class MemoryAllocator {
     allocators = new PageAllocator[3];
     mPageSizeSet = new int[3];
     mPageSizeSet[0] = 1024 * 1024;
-    mPageSizeSet[1] = 1024 * 4;
+    mPageSizeSet[1] = 1024 * 8;
     mPageSizeSet[2] = 512;
     mPage2IndexMap = new HashMap<>();
-    allocators[0] = new PageAllocator(512, mPageSizeSet[0]);
+    allocators[0] = new PageAllocator(64, mPageSizeSet[0]);
     allocators[1] = new PageAllocator(1024 * 128, mPageSizeSet[1]);
     allocators[2] = new PageAllocator(1024, mPageSizeSet[2]);
 

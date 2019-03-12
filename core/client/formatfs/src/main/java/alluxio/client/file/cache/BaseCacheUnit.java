@@ -2,7 +2,6 @@ package alluxio.client.file.cache;
 
 import alluxio.client.file.cache.struct.LinkNode;
 import io.netty.buffer.ByteBuf;
-import org.apache.hadoop.io.serializer.Serialization;
 
 import java.io.IOException;
 import java.io.Serializable;

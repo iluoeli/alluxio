@@ -7,7 +7,7 @@ import org.apache.commons.lang3.RandomUtils;
 import java.util.*;
 
 public class MTLRUEvictor extends LRUEvictor {
-  private Map<Long, LRUEvictContext> baseEvictCotext = new HashMap<>();
+  protected Map<Long, LRUEvictContext> baseEvictCotext = new HashMap<>();
   public Map<Long, LRUEvictContext> actualEvictContext = new HashMap<>();
   private List<Double> mVCValue = new ArrayList<>();
   protected int mCurrentIndex = 0;
@@ -54,9 +54,17 @@ public class MTLRUEvictor extends LRUEvictor {
   }
 
   public void test() {
-    for (int i = 0; i < 10; i ++) {
+    for (int i = 0; i < 100; i ++) {
       System.out.println("==================================================");
      // mAccessSize = mHitSize = 0;
+      if (i == 10) {
+        for (long userId : actualEvictContext.keySet()) {
+         actualEvictContext.get(userId).initAccessRecord();
+        }
+        for (long userId : baseEvictCotext.keySet()) {
+          baseEvictCotext.get(userId).initAccessRecord();
+        }
+      }
       boolean reverse = false;
       for (int j = 0; j < 3072; j ++) {
         if (j % 3 == 0) {
@@ -78,6 +86,7 @@ public class MTLRUEvictor extends LRUEvictor {
         TmpCacheUnit unit = new TmpCacheUnit(mTestFileId, begin, end);
         access(userId, unit);
       }
+      /*
       for (int j = 0; j < 3072; j ++) {
         if (j % 3 == 0) {
           evictCheck();
@@ -90,15 +99,15 @@ public class MTLRUEvictor extends LRUEvictor {
         TmpCacheUnit unit = new TmpCacheUnit(mTestFileId, begin, end);
         access(userId, unit);
       }
-
+     */
       System.out.println("all : " + (double)mHitSize / (double)mAccessSize);
       System.out.println("actual : ");
       for (long userId : actualEvictContext.keySet()) {
-        System.out.println(userId + " : " + actualEvictContext.get(userId).computeHitRatio());
+        System.out.println(userId + " : " + actualEvictContext.get(userId).computePartialHitRatio());
       }
       System.out.println("base : ");
       for (long userId : baseEvictCotext.keySet()) {
-        System.out.println(userId + " : " + baseEvictCotext.get(userId).computeHitRatio());
+        System.out.println(userId + " : " + baseEvictCotext.get(userId).computePartialHitRatio());
       }
 
     }

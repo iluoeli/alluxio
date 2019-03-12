@@ -9,12 +9,7 @@ public class SequentialMTLRUEvictor extends LRUEvictor {
   private Map<Long, LRUEvictContext> baseEvictCotext = new HashMap<>();
   private Map<Long, Integer> missCountMap = new HashMap<>();
   private Map<Long, Integer> hitCountMap = new HashMap<>();
-  private TreeSet<TmpCacheUnit> p = new TreeSet<>(new Comparator<TmpCacheUnit>() {
-    @Override
-    public int compare(TmpCacheUnit o1, TmpCacheUnit o2) {
-      return (int)(o2.mCost - o1.mCost);
-    }
-  });
+  private TreeSet<TmpCacheUnit> p = new TreeSet<>((o1, o2) -> (int)(o2.mCost - o1.mCost));
   private LinkedList<TmpCacheUnit> accessList = new LinkedList<>();
   private long cachespace;
   private long usedSpace;

@@ -1,5 +1,6 @@
 package alluxio.client.file.cache.test;
 
+import alluxio.client.file.FileInStream;
 import alluxio.client.file.cache.*;
 import alluxio.client.file.cache.struct.DoubleLinkedList;
 import alluxio.client.file.cache.struct.LongPair;
@@ -117,4 +118,8 @@ public class ISKCacheTest {
   	test.test1();
   	test.testVisit();
 	}
+
+	class FakeFileInStream extends FileInStream {
+
+  }
 }

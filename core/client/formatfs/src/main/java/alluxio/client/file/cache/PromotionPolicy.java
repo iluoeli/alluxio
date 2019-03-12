@@ -1,5 +1,6 @@
 package alluxio.client.file.cache;
 
+import alluxio.client.file.cache.Metric.SlidingWindowAdaptor;
 import alluxio.client.file.cache.submodularLib.ISK;
 import alluxio.client.file.cache.submodularLib.IterateOptimizer;
 import alluxio.client.file.cache.submodularLib.cacheSet.CacheSet;
@@ -13,6 +14,7 @@ import java.io.IOException;
 import java.util.*;
 
 import static alluxio.client.file.cache.ClientCacheContext.mPromotionThreadId;
+import static alluxio.client.file.cache.ClientCacheContext.timeMap;
 import static alluxio.client.file.cache.ClientCacheContext.useNettyMemoryUtils;
 
 public class PromotionPolicy implements Runnable {
@@ -25,7 +27,8 @@ public class PromotionPolicy implements Runnable {
   private final Object mAccessLock = new Object();
   private ClientCacheContext mContext = ClientCacheContext.INSTANCE;
   private volatile int mSize;
-  private boolean onlyOne = false;
+  private boolean isFakeUpdate = false;
+  private SlidingWindowAdaptor mWindowAdaptor;
 
   public void setPolicy(CachePolicy.PolicyName name) {
     if (name == CachePolicy.PolicyName.ISK) {
@@ -35,6 +38,10 @@ public class PromotionPolicy implements Runnable {
       mOptimizer = null;
       mOptimizer = new GR((mCacheCapacity), new CacheSetUtils());
     }
+  }
+
+  public void setFakeUpdate(boolean isFakeUpdate) {
+    this.isFakeUpdate = isFakeUpdate;
   }
 
   public void addFileLength(long fileId, long fileLength) {
@@ -66,7 +73,6 @@ public class PromotionPolicy implements Runnable {
       }
       mSize++;
     }
-
   }
 
   public void updateTest(ClientCacheContext context) {
@@ -122,7 +128,9 @@ public class PromotionPolicy implements Runnable {
     try {
       result.convertSort();
       System.out.println("start merge");
-      mContext.merge(result);
+      if (!isFakeUpdate) {
+        mContext.merge(result);
+      }
     } catch (IOException | AlluxioException e) {
       throw new RuntimeException(e);
     }
@@ -134,7 +142,7 @@ public class PromotionPolicy implements Runnable {
   }
 
   private boolean promoteCheck() {
-    return mSize > 1000;
+    return mSize > 1100;
   }
 
   public void init(long limit) {
@@ -143,7 +151,8 @@ public class PromotionPolicy implements Runnable {
     mInputSpace2 = new CacheSet();
     setPolicy(CachePolicy.PolicyName.GR);
     mContext.stopCache();
-    mContext.COMPUTE_POOL.submit(this);
+    //mContext.COMPUTE_POOL.submit(this);
+    mWindowAdaptor = new SlidingWindowAdaptor(this);
   }
 
 
@@ -155,12 +164,8 @@ public class PromotionPolicy implements Runnable {
     while (true) {
       try {
         if (promoteCheck()) {
-          if (!onlyOne) {
-            update();
-            onlyOne = true;
-          } else {
-
-          }
+          update();
+          mWindowAdaptor.moveWindow();
         }
       } catch (Exception e) {
         e.printStackTrace();

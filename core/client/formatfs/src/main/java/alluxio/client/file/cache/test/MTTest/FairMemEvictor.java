@@ -14,7 +14,6 @@ public class FairMemEvictor extends MTLRUEvictor {
   }
 
 
-
   public void access( long userId, TmpCacheUnit unit) {
     unit.mCost = ++mCurrentIndex;
     if (!mUserContext.containsKey(userId)) {
@@ -49,8 +48,6 @@ public class FairMemEvictor extends MTLRUEvictor {
     mAccessSize += unit.getSize();
     mHitSize += unit.getSize() - newSize;
     actualSize += newSize;
-    System.out.println(mContext.getAllSize(mContext) / ( 1024 * 1024));
-
   }
 
   public static void main(String[] args) {

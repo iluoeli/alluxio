@@ -10,21 +10,39 @@ import java.util.List;
 
 public abstract class BaseEvictContext {
   public double mHitRatio;
-  public double mHitSize;
-  public double mVisitSize;
+  public long mHitSize;
+  public long mVisitSize;
   protected long mCacheSize = 0;
   public long mTestFileId;
   public long mTestFileLength;
   public long mCacheCapacity;
   public UnlockTask unlockTask = new UnlockTask();
   public ClientCacheContext mCacheContext;
-
+  private long mLastVisitSize = 0;
+  private long mLastHitSize = 0;
+  private double mLastHRD;
 
   public double computeHitRatio() {
     mHitRatio = mHitSize / mVisitSize;
     return mHitRatio;
   }
 
+  public void initHRD(double lastHRD) {
+    mLastHRD = lastHRD;
+  }
+
+  public double getLastHRD() {
+    return mLastHRD;
+  }
+
+  public double computePartialHitRatio() {
+    return (double) (mHitSize - mLastHitSize) / (double) (mVisitSize - mLastVisitSize);
+  }
+
+  public void initAccessRecord() {
+    mLastHitSize = mHitSize;
+    mLastVisitSize = mVisitSize;
+  }
 
   public BaseEvictContext(LRUEvictor test, ClientCacheContext cacheContext) {
     mTestFileId = test.mTestFileId;

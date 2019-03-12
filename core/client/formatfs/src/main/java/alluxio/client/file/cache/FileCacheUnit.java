@@ -18,6 +18,7 @@ import alluxio.client.file.FileSystem;
 import alluxio.client.file.cache.struct.DoubleLinkedList;
 import alluxio.client.file.cache.struct.LongPair;
 import alluxio.exception.AlluxioException;
+import alluxio.exception.PreconditionMessage;
 import com.google.common.base.Preconditions;
 import io.netty.buffer.ByteBuf;
 
@@ -130,9 +131,10 @@ public class FileCacheUnit {
 
   }*/
 
-  public void cacheCoinFiliter(Queue<CacheUnit> queue, Queue<LongPair> tmpQueue) {
+  public static long cacheCoinFiliter(Queue<CacheUnit> queue, Queue<LongPair> tmpQueue) {
     long maxEnd = -1;
     long minBegin = -1;
+    long sum = 0;
     while (!queue.isEmpty()) {
       CacheUnit tmpUnit = queue.poll();
       if (minBegin == -1) {
@@ -143,12 +145,15 @@ public class FileCacheUnit {
           maxEnd = Math.max(tmpUnit.getEnd(), maxEnd);
         } else {
           tmpQueue.add(new LongPair(minBegin, maxEnd));
+          sum += (maxEnd - minBegin);
           minBegin = tmpUnit.getBegin();
           maxEnd = tmpUnit.getEnd();
         }
       }
     }
     tmpQueue.add(new LongPair(minBegin, maxEnd));
+    sum += (maxEnd - minBegin);
+    return sum;
   }
 
   public boolean testFinish(TempCacheUnit unit) {
@@ -198,6 +203,8 @@ public class FileCacheUnit {
     LockTask task = new LockTask(mLockManager, mFileId);
     FileSystem fs = CacheFileSystem.get(false);
     FileInStream in = fs.openFile(uri);
+    //FileInStream in = new FakeFileInStream();
+
     long newSize = 0;
     CacheInternalUnit curr = cacheList.head.after;
     long pos = 0;
@@ -420,5 +427,32 @@ public class FileCacheUnit {
       tmp = null;
       tmp = next;
     }
+  }
+
+  class FakeFileInStream extends FileInStream {
+    int pos = 0;
+
+    public long getPos() {
+      return pos;
+    }
+
+    @Override
+    public long skip(long n) throws IOException {
+      pos += n;
+      return n;
+    }
+
+    @Override
+    public int read(byte[] b, int off, int len) throws IOException {
+
+      byte[] tmp = new byte[len];
+      for (int i = off; i < off + len; i ++) {
+        b[i] = tmp[i - off];
+      }
+      tmp = null;
+      pos += len;
+      return len;
+    }
+
   }
 }

@@ -20,11 +20,14 @@ import java.nio.ByteBuffer;
 import java.nio.MappedByteBuffer;
 import java.nio.channels.FileChannel;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
+import static alluxio.client.block.stream.BlockInStream.mmapTime;
+import static alluxio.client.file.cache.ClientCacheContext.missTime;
 import static alluxio.client.file.cache.ClientCacheContext.timeMap;
 
 public class testRead {
@@ -34,6 +37,10 @@ public class testRead {
   public static CountDownLatch tmp = new CountDownLatch(4);
   public static CountDownLatch tmp1 = new CountDownLatch(1);
   public static boolean isWrite = false;
+  public static long  actualRead = 0;
+  public static long cacheRead = 0;
+  public static long tmpRead = 0;
+
 
   public static AlluxioURI writeToAlluxio(String s, String alluxioName) throws Exception {
     AlluxioURI uri = new AlluxioURI(alluxioName);
@@ -102,6 +109,53 @@ public class testRead {
 
   }
 
+  public static void AlluxioMultiRead(String tmp) throws Exception {
+    AlluxioURI uri = new AlluxioURI(tmp);
+    FileSystem fs = FileSystem.Factory.get();
+    FileInStream in = fs.openFile(uri);
+    int bufferLenth = 1024 * 1024;
+    COMPUTE_POOL.submit(new Runnable() {
+      @Override
+      public void run() {
+        try {
+          byte[] b = new byte[bufferLenth];
+
+          AlluxioURI uri = new AlluxioURI("/testWriteBig1");
+          FileSystem fs = FileSystem.Factory.get();
+          FileInStream in = fs.openFile(uri);
+          long beginMax = in.remaining();
+          long begin = System.currentTimeMillis();
+
+          for (int i = 0; i < 1024; ) {
+            long readBegin;
+            readBegin = RandomUtils.nextLong(0, beginMax);
+          // in.positionedRead(readBegin, b, 0, bufferLenth);
+          }
+          System.out.println(System.currentTimeMillis() - begin);
+
+        } catch (Exception e) {
+          throw new RuntimeException(e);
+        }
+
+      }
+    });
+    long beginMax = in.remaining();
+    byte[] b = new byte[bufferLenth];
+    for (int i2 =0 ; i2 < 100; i2 ++) {
+      mmapTime.clear();
+      long begin = System.currentTimeMillis();
+      for (int i = 0; i < 1024; i++) {
+        long readBegin;
+        readBegin = RandomUtils.nextLong(0, beginMax);
+        in.positionedRead(readBegin, b, 0, bufferLenth);
+      }
+      System.out.println(System.currentTimeMillis() - begin);
+      System.out.println("rpc time " + mmapTime.get(Thread.currentThread().getId()));
+
+    }
+
+  }
+
   public static List<ByteBuffer> mmapTest(String filePath) throws Exception {
     RandomAccessFile mLocalFile = new RandomAccessFile(filePath, "r");
     FileChannel mLocalFileChannel = mLocalFile.getChannel();
@@ -109,9 +163,9 @@ public class testRead {
     int pos = 0;
     List<ByteBuffer> ll = new ArrayList<>();
     while (len > 0) {
-      //MappedByteBuffer mm = mLocalFileChannel.map(FileChannel.MapMode.READ_ONLY, pos, Math.min
-      //  (1024 * 1024 , len));
-       ByteBuffer mm= ByteBuffer.allocate(1024 *  1024);
+      MappedByteBuffer mm = mLocalFileChannel.map(FileChannel.MapMode.READ_ONLY, pos, Math.min
+        (1024 * 32 , len));
+      // ByteBuffer mm= ByteBuffer.allocate(1024 *  1024);
 
       ll.add(mm);
       pos += mm.capacity();
@@ -280,11 +334,12 @@ public class testRead {
   public static void promotionTest(String s) throws Exception {
     long begin = System.currentTimeMillis();
     FileInStream.initmetric();
-    ClientCacheContext.missSize = 0;
-    ClientCacheContext.allHitTime = 0;
+    actualRead = 0;
+    cacheRead = 0 ;
+    tmpRead = 0;
     ClientCacheContext.missTime = 0;
     AlluxioURI uri = new AlluxioURI(s);
-    FileSystem fs = CacheFileSystem.get(false);
+    FileSystem fs = CacheFileSystem.get(true);
     FileInStream in = fs.openFile(uri);
     long fileLength = fs.getStatus(uri).getLength();
     int bufferLenth = 1024 * 1024;
@@ -293,22 +348,27 @@ public class testRead {
     int readNum = 0;
     for (int i = 0; i < 1024; i++) {
       long readBegin;
-      if(!isWrite) {
+      //if(!isWrite) {
         readBegin = RandomUtils.nextLong(0, beginMax);
-        beginList.add(readBegin);
-      } else {
+       // beginList.add(readBegin);
+      //} else {
         //if (readNum < 800) {
          // readBegin = RandomUtils.nextLong(0, beginMax);
         //} else {
-          readBegin = beginList.get(i);
+         // readBegin = beginList.get(i);
         //}
-      }
+      //}
       in.positionedRead(readBegin, b, 0, bufferLenth);
       readNum ++;
     }
     isWrite = true;
     //out.write(System.currentTimeMillis() - begin + "");
     //out.newLine();
+    System.out.println("------------------");
+    System.out.println("actual read : " +actualRead);
+    System.out.println("cache read : " + cacheRead);
+    System.out.println("tmp read : " + tmpRead);
+   System.out.println("------------------");
     System.out.println(Thread.currentThread().getId() + " read time : " + (System
       .currentTimeMillis() - begin));
   }
@@ -404,7 +464,7 @@ public class testRead {
 
 
   public static void main(String[] args) throws Exception {
-     writeToAlluxio("/usr/local/test.gz", "/testWriteBig");
+    // writeToAlluxio("/usr/local/test.gz", "/testWriteBig");
     // promoteHeapTest();
     //for (int i =0 ; i < 10; i ++) {
     // test();
@@ -412,9 +472,16 @@ public class testRead {
     // }
 
     //multiThreadTest();
-
+    for (int i = 0 ;i < 100; i ++) {
+     // promotionTest("/testWriteBig");
+    }
+   // AlluxioMultiRead( "/testWriteBig");
+    List<ByteBuffer> l = mmapTest("/usr/local/test.gz");
+    for (int i = 0 ;i  <10; i ++) {
+      readFromMMap(l);
+    }
     /*
-
+mmapTest
     AlluxioURI uri = new AlluxioURI("/testWriteBig");
     FileSystem fs = CacheFileSystem.get(false);
     FileInStream in = fs.openFile(uri);

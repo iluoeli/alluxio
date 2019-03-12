@@ -141,6 +141,7 @@ public class HitCalculator extends CacheHitCalculator {
   @Override
   public void clear() {
     //mBaseContext.clear();
-    mBaseContext.mFileIdToInternalList.clear();
+    mBaseContext.clear();
+    mContext.clear();
   }
 }

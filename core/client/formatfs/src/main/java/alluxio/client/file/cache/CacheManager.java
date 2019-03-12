@@ -1,6 +1,7 @@
 package alluxio.client.file.cache;
 
 import alluxio.client.HitMetric;
+import alluxio.client.file.cache.Metric.HitRatioMetric;
 import io.netty.buffer.ByteBuf;
 import org.omg.Messaging.SYNC_WITH_TRANSPORT;
 
@@ -31,6 +32,7 @@ public final class CacheManager {
 
   public int read(TempCacheUnit unit, byte[] b, int off, int readlen, long pos, boolean isAllowCache) throws IOException {
     int res = -1;
+    long begin = System.currentTimeMillis();
     res = unit.lazyRead(b, off, readlen, pos, isAllowCache);
     BaseCacheUnit unit1 = new BaseCacheUnit(unit.getFileId(), pos, pos + res);
     unit1.setCurrentHitVal(unit.getNewCacheSize());
@@ -50,11 +52,15 @@ public final class CacheManager {
       promoter.filter(unit1);
     }
     unit.getLockTask().unlockAll();
+    testRead.tmpRead += System.currentTimeMillis() - begin;
+    HitRatioMetric.INSTANCE.accessSize += readlen;
     return res;
   }
 
   public int read(CacheInternalUnit unit, byte[] b, int off, long pos, int len) {
     try {
+      long begin = System.currentTimeMillis();
+
       int remaining = unit.positionedRead(b, off, pos, len);
       HitMetric.mHitSize += len;
       unit.getLockTask().unlockAllReadLocks();
@@ -65,6 +71,8 @@ public final class CacheManager {
       } else {
         promoter.filter(currentUnit);
       }
+      testRead.cacheRead += System.currentTimeMillis() - begin;
+      HitRatioMetric.INSTANCE.accessSize += len;
 
       return remaining;
     } catch (Exception e) {
