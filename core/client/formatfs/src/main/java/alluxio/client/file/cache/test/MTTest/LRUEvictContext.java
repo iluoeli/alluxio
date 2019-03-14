@@ -13,11 +13,13 @@ import java.util.List;
 import java.util.Set;
 
 public class LRUEvictContext extends BaseEvictContext {
-   LinkedList<TmpCacheUnit> mLRUList = new LinkedList<>();
-  private Set<TmpCacheUnit> accessSet = new HashSet<>();
+  LinkedList<TmpCacheUnit> mLRUList = new LinkedList<>();
+  Set<TmpCacheUnit> accessSet = new HashSet<>();
 
-  public LRUEvictContext(LRUEvictor test, ClientCacheContext cacheContext) {
-    super(test, cacheContext);
+
+
+  public LRUEvictContext(MTLRUEvictor test, ClientCacheContext cacheContext, long userId) {
+    super(test, cacheContext, userId);
   }
 
   public void evict() {
@@ -53,16 +55,18 @@ public class LRUEvictContext extends BaseEvictContext {
       mLRUList.remove(unit);
       mLRUList.addLast(unit);
     }
-    if (res.isFinish()) {
-      mHitSize += unit.getSize();
-    } else {
+    if (!res.isFinish()) {
       TempCacheUnit unit1 = (TempCacheUnit)res;
       long missSize = mCacheContext.computeIncrese(unit1);
       mHitSize += (unit.getSize() - missSize);
-      newSize += missSize;
       mCacheContext.addCache(unit1);
+      newSize += missSize;
+      mCacheSize += newSize;
+      mStoreSet.add(unit);
+    } else {
+      mHitSize += unit.getSize();
     }
-    mCacheSize += newSize;
+    //test();
     return newSize;
   }
   public long remove(TmpCacheUnit deleteUnit) {
@@ -70,13 +74,39 @@ public class LRUEvictContext extends BaseEvictContext {
       deleteUnit.getEnd(), unlockTask);
     long res = 0;
     if (unit.isFinish()) {
-      mCacheSize -= unit.getSize();
       mCacheContext.delete((CacheInternalUnit) unit);
+      if (mStoreSet.contains(deleteUnit)) {
+        mStoreSet.remove(deleteUnit);
+        mCacheSize -= deleteUnit.getSize();
+      }
       res += unit.getSize();
     }
-    mLRUList.remove(deleteUnit);
-    accessSet.remove(deleteUnit);
+    if (accessSet.contains(deleteUnit)) {
+      mLRUList.remove(deleteUnit);
+      accessSet.remove(deleteUnit);
+    }
     return res;
+  }
+
+  public void test () {
+    long tmpSum = 0;
+    for (TmpCacheUnit u : accessSet) {
+      tmpSum += u.getSize();
+    }
+    if (tmpSum != mCacheSize) {
+      throw new RuntimeException();
+    }
+  }
+
+  public void removeByShare(TmpCacheUnit deleteUnit) {
+    if (accessSet.contains(deleteUnit)) {
+      mLRUList.remove(deleteUnit);
+      accessSet.remove(deleteUnit);
+      if (mStoreSet.contains(deleteUnit)) {
+        mStoreSet.remove(deleteUnit);
+        mCacheSize -= deleteUnit.getSize();
+      }
+    }
   }
 
   public TmpCacheUnit getMaxPriorityUnit() {

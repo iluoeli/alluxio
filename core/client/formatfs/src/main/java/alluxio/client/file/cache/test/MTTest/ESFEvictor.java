@@ -13,7 +13,7 @@ public class ESFEvictor extends MTLRUEvictor {
   @Override
   public void access(long userId, TmpCacheUnit unit) {
     if (!actualEvictContext.containsKey(userId)) {
-      actualEvictContext.put(userId, new LRUEvictContext(this, mContext));
+      actualEvictContext.put(userId, new LRUEvictContext(this, mContext, userId));
     }
     long actualNew = actualEvictContext.get(userId).access(unit);
 
@@ -22,8 +22,8 @@ public class ESFEvictor extends MTLRUEvictor {
     actualSize += actualNew;
 
     if (!baseEvictCotext.containsKey(userId)) {
-      LRUEvictContext base = new LRUEvictContext(this, new ClientCacheContext(false));
-      base.resetCapacity((long)(cacheSize));
+      LRUEvictContext base = new LRUEvictContext(this, new ClientCacheContext(false), userId);
+      base.resetCapacity(cacheSize);
       baseEvictCotext.put(userId, base);
     }
     baseEvictCotext.get(userId).accessByShare(unit, mContext);
@@ -31,13 +31,17 @@ public class ESFEvictor extends MTLRUEvictor {
     if (actualSize > cacheSize) {
       evict();
     }
+
+    mBaseEvictContext.access(unit);
+    mBaseEvictContext.evict();
   }
 
   private double getHRDCost(double HRD, long userId) {
-    return (HRD) * 100 / ((double)actualEvictContext.get(userId).mCacheSize / mBase);
+    return (HRD) * 100 * ((actualEvictContext.get(userId).mCacheSize) / cacheSize);
   }
 
   public void evict() {
+    //System.out.println("----------------");
     while (actualSize > cacheSize) {
       double minHRDCost = Integer.MAX_VALUE;
       long minCostUserId = -1;
@@ -45,14 +49,20 @@ public class ESFEvictor extends MTLRUEvictor {
         double actualHitRatio = actualEvictContext.get(userId).computePartialHitRatio();
         double baseHitRatio = baseEvictCotext.get(userId).computePartialHitRatio();
         double HRDCost = getHRDCost(baseHitRatio - actualHitRatio, userId);
-        if (HRDCost < minHRDCost ){
+      //  System.out.println(userId  +" " + actualHitRatio + " "+baseHitRatio + " " +HRDCost);
+        if (HRDCost < minHRDCost && actualEvictContext.get(userId).mCacheSize > 0 ){
           minHRDCost = HRDCost;
           minCostUserId = userId;
         }
       }
+
+      //System.out.println(minCostUserId);
+
       TmpCacheUnit unit = actualEvictContext.get(minCostUserId).getEvictUnit();
       actualSize -=  actualEvictContext.get(minCostUserId).remove(unit);
+      checkRemoveByShare(unit, minCostUserId);
     }
+   // System.out.println("================");
   }
 
   public static void main(String [] args) {

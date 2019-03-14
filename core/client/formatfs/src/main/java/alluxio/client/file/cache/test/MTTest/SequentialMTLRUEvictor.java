@@ -27,7 +27,7 @@ public class SequentialMTLRUEvictor extends LRUEvictor {
   private void access(TmpCacheUnit unit, long clientId) {
     if (!baseEvictCotext.containsKey(clientId)) {
       ClientCacheContext context = new ClientCacheContext(false);
-      baseEvictCotext.put(clientId, new LRUEvictContext(new LRUEvictor(context), context));
+      baseEvictCotext.put(clientId, new LRUEvictContext(new MTLRUEvictor(context), context, clientId));
     }
     unit.mCost = function(missCountMap.getOrDefault(clientId, 0));
     unit.mClientIndex = clientId;

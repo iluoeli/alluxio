@@ -12,15 +12,17 @@ public class MMFEvictor extends MTLRUEvictor {
   @Override
   public void access(long userId, TmpCacheUnit unit) {
     if (!actualEvictContext.containsKey(userId)) {
-      actualEvictContext.put(userId, new LRUEvictContext(this, mContext));
+      actualEvictContext.put(userId, new LRUEvictContext(this, mContext, userId));
     }
     long actualNew = actualEvictContext.get(userId).access(unit);
 
     mAccessSize += unit.getSize();
     mHitSize += unit.getSize() - actualNew;
-    actualSize += actualNew;
-    if (actualSize > cacheSize) {
-      evict();
+    if (actualNew > 0) {
+      actualSize += actualNew;
+      if (actualSize > cacheSize) {
+        evict();
+      }
     }
   }
 
@@ -38,6 +40,7 @@ public class MMFEvictor extends MTLRUEvictor {
       }
       TmpCacheUnit unit = actualEvictContext.get(maxUserId).getEvictUnit();
       actualSize -= actualEvictContext.get(maxUserId).remove(unit);
+      checkRemoveByShare(unit, maxUserId);
     }
   }
 

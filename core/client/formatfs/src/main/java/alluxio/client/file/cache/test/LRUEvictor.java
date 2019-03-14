@@ -15,7 +15,7 @@ public class LRUEvictor {
   public long mTestFileLength = 1024 * 1024 * 1024;
   protected Set<BaseCacheUnit> visitList = new HashSet<>();
   public UnlockTask unlockTask = new UnlockTask();
-  public long cacheSize = 1024 * 1024 * 512;
+  public long cacheSize = 1024 * 1024 * 300;
 
   public LRUEvictor(ClientCacheContext context) {
     mContext = context;

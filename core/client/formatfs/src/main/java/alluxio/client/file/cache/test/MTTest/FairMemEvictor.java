@@ -17,7 +17,7 @@ public class FairMemEvictor extends MTLRUEvictor {
   public void access( long userId, TmpCacheUnit unit) {
     unit.mCost = ++mCurrentIndex;
     if (!mUserContext.containsKey(userId)) {
-      mUserContext.put(userId, new BaseAllocateContext(new LRUEvictContext(this, mContext), cacheSize / mUserNumber));
+      mUserContext.put(userId, new BaseAllocateContext(new LRUEvictContext(this, mContext, userId), cacheSize / mUserNumber));
     }
     BaseAllocateContext userContext = mUserContext.get(userId);
     long newSize = userContext.access(unit);

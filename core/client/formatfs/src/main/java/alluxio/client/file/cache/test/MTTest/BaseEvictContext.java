@@ -6,7 +6,9 @@ import alluxio.client.file.cache.TempCacheUnit;
 import alluxio.client.file.cache.UnlockTask;
 import alluxio.client.file.cache.test.LRUEvictor;
 
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 public abstract class BaseEvictContext {
   public double mHitRatio;
@@ -21,11 +23,10 @@ public abstract class BaseEvictContext {
   private long mLastVisitSize = 0;
   private long mLastHitSize = 0;
   private double mLastHRD;
+  long mUserId;
+  protected MTLRUEvictor mtlruEvictor;
+  Set<TmpCacheUnit> mStoreSet = new HashSet<>();
 
-  public double computeHitRatio() {
-    mHitRatio = mHitSize / mVisitSize;
-    return mHitRatio;
-  }
 
   public void initHRD(double lastHRD) {
     mLastHRD = lastHRD;
@@ -44,11 +45,13 @@ public abstract class BaseEvictContext {
     mLastVisitSize = mVisitSize;
   }
 
-  public BaseEvictContext(LRUEvictor test, ClientCacheContext cacheContext) {
+  public BaseEvictContext(MTLRUEvictor test, ClientCacheContext cacheContext, long userId) {
     mTestFileId = test.mTestFileId;
     mTestFileLength = test.mTestFileLength;
     mCacheCapacity = test.cacheSize;
     mCacheContext = cacheContext;
+    mUserId = userId;
+    mtlruEvictor = test;
   }
 
   public BaseEvictContext resetCapacity(long capacitySize) {
@@ -62,8 +65,8 @@ public abstract class BaseEvictContext {
       access(unit);
     }
     return access(unit);
-
   }
+
 
   public abstract List<TmpCacheUnit> getCacheList();
 
