@@ -1,10 +1,6 @@
-package alluxio.client.file.cache.test.MTTest;
+package alluxio.client.file.cache.test.mt;
 
-import alluxio.client.file.cache.CacheUnit;
-import alluxio.client.file.cache.ClientCacheContext;
-import alluxio.client.file.cache.TempCacheUnit;
-import alluxio.client.file.cache.UnlockTask;
-import alluxio.client.file.cache.test.LRUEvictor;
+import alluxio.client.file.cache.*;
 
 import java.util.HashSet;
 import java.util.List;
@@ -15,7 +11,6 @@ public abstract class BaseEvictContext {
   public long mHitSize;
   public long mVisitSize;
   protected long mCacheSize = 0;
-  public long mTestFileId;
   public long mTestFileLength;
   public long mCacheCapacity;
   public UnlockTask unlockTask = new UnlockTask();
@@ -46,7 +41,6 @@ public abstract class BaseEvictContext {
   }
 
   public BaseEvictContext(MTLRUEvictor test, ClientCacheContext cacheContext, long userId) {
-    mTestFileId = test.mTestFileId;
     mTestFileLength = test.mTestFileLength;
     mCacheCapacity = test.cacheSize;
     mCacheContext = cacheContext;
@@ -60,11 +54,45 @@ public abstract class BaseEvictContext {
   }
 
   public long accessByShare(TmpCacheUnit unit, ClientCacheContext sharedContext) {
-    CacheUnit unit1 = sharedContext.getCache(mTestFileId, mTestFileLength, unit.getBegin(), unit.getEnd(), unlockTask);
+    CacheUnit unit1 = sharedContext.getCache(unit.getFileId(), mTestFileLength, unit.getBegin(), unit.getEnd(), unlockTask);
     if (unit1.isFinish()) {
       access(unit);
     }
     return access(unit);
+  }
+
+  long access0(TmpCacheUnit unit) {
+    long newSize = 0;
+    mVisitSize += unit.getSize();
+    CacheUnit res1 = mCacheContext.getCache(unit.getFileId(), mTestFileLength, unit.getBegin(), unit.getEnd(), unlockTask);
+    if (!res1.isFinish()) {
+      TempCacheUnit unit1 = (TempCacheUnit)res1;
+      long missSize = mCacheContext.computeIncrese(unit1);
+      mHitSize += (unit.getSize() - missSize);
+      mCacheContext.addCache(unit1);
+      newSize += missSize;
+      mCacheSize += newSize;
+      mStoreSet.add(unit);
+    } else {
+      mHitSize += unit.getSize();
+    }
+
+    return newSize;
+  }
+
+  long remove0(TmpCacheUnit deleteUnit) {
+    CacheUnit unit = mCacheContext.getCache(deleteUnit.getFileId(), mTestFileLength, deleteUnit.getBegin(),
+            deleteUnit.getEnd(), unlockTask);
+    long res = 0;
+    if (unit.isFinish()) {
+      mCacheContext.delete((CacheInternalUnit) unit);
+      if (mStoreSet.contains(deleteUnit)) {
+        mStoreSet.remove(deleteUnit);
+        mCacheSize -= deleteUnit.getSize();
+      }
+      res += unit.getSize();
+    }
+    return res;
   }
 
 
@@ -79,4 +107,6 @@ public abstract class BaseEvictContext {
   public abstract TmpCacheUnit getMaxPriorityUnit();
 
   public abstract void evict();
+
+  public abstract void removeByShare(TmpCacheUnit deleteUnit);
 }

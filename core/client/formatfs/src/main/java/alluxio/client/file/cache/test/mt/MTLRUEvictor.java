@@ -1,23 +1,37 @@
-package alluxio.client.file.cache.test.MTTest;
+package alluxio.client.file.cache.test.mt;
 
 import alluxio.client.file.cache.*;
 import alluxio.client.file.cache.test.LRUEvictor;
+import alluxio.client.file.cache.test.mt.distributionGenerator.Generator;
+import alluxio.client.file.cache.test.mt.distributionGenerator.LRUGenerator;
+import alluxio.client.file.cache.test.mt.distributionGenerator.ScanGenerator;
+import alluxio.client.file.cache.test.mt.distributionGenerator.ZipfGenerator;
 import org.apache.commons.lang3.RandomUtils;
 
 import java.util.*;
 
 public class MTLRUEvictor extends LRUEvictor {
   protected Map<Long, LRUEvictContext> baseEvictCotext = new HashMap<>();
-  public Map<Long, LRUEvictContext> actualEvictContext = new HashMap<>();
+  public Map<Long, BaseEvictContext> actualEvictContext = new HashMap<>();
   private List<Double> mVCValue = new ArrayList<>();
   protected int mCurrentIndex = 0;
-  private double mEvictRatio = 0.2;
+  private double mEvictRatio = 0.5;
   private int sampleSize = 1000;
   protected long actualSize = 0;
   protected long mAccessSize;
   protected long mHitSize;
   public long mLimit = 10 * 1024 * 1024;
+  private int userNum = 3;
   public BaseEvictContext mBaseEvictContext = new LRUEvictContext(this, new ClientCacheContext(false), -1);
+
+  public static Map<Long, Generator> userMap = new HashMap<>();
+
+  static {
+    userMap.put(1L, new LRUGenerator(1000));
+    userMap.put(2L, new ZipfGenerator(1000, 0.3));
+    userMap.put(3L, new ScanGenerator(1000));
+  }
+
 
   public void checkRemoveByShare(TmpCacheUnit unit, long userID) {
     for (long userId : actualEvictContext.keySet()) {
@@ -63,8 +77,33 @@ public class MTLRUEvictor extends LRUEvictor {
     return res;
   }
 
+  private double getFairnessIndex() {
+    double tmpSum = 0;
+    double tmpSum2 = 0;
+    for (long userId : baseEvictCotext.keySet()) {
+      double baseHitRatio = baseEvictCotext.get(userId).computePartialHitRatio();
+      double actualRatio = actualEvictContext.get(userId).computePartialHitRatio();
+      double accessRatio = (double) actualEvictContext.get(userId).mVisitSize / (double) mAccessSize;
+      double tmpVal =(actualRatio / (baseHitRatio / userNum )) / accessRatio;
+      tmpSum += tmpVal;
+      tmpSum2 += tmpVal * tmpVal;
+    }
+    tmpSum = tmpSum * tmpSum;
+
+    return tmpSum / (userNum * tmpSum2);
+
+  }
+
   public void test() {
-    for (int i = 0; i < 20; i ++) {
+    ZipfGenerator generator0 = new ZipfGenerator(1000, 0.3);
+    ZipfGenerator generator1 = new ZipfGenerator(512, 0.3);
+    ZipfGenerator generator2 = new ZipfGenerator(256, 0.3);
+    //LRUGenerator generator0 = new LRUGenerator(1024);
+    //LRUGenerator generator1 = new LRUGenerator(512);
+   // LRUGenerator generator2 = new LRUGenerator(256);
+    ScanGenerator userGenerator = new ScanGenerator(3);
+
+    for (int i = 0; i < 10; i ++) {
       System.out.println("==================================================");
      // mAccessSize = mHitSize = 0;
       if (i == 10) {
@@ -77,26 +116,29 @@ public class MTLRUEvictor extends LRUEvictor {
       }
       mBaseEvictContext.initAccessRecord();
       boolean reverse = false;
-      for (int j = 0; j < 1000; j ++) {
+      for (int j = 0; j < 6000; j ++) {
         if (j % 3 == 0) {
           evictCheck();
         }
-       int randomIndex = RandomUtils.nextInt(0, 3);
-       if (randomIndex < 2) {
-         int randomIndex1 = RandomUtils.nextInt(0, 2);
-         if (randomIndex1 == 0) {
-           randomIndex = 2;
-         }
-        }
-        int tmp;
-        if (randomIndex == 0) {
-          tmp = RandomUtils.nextInt(0, 1023);
-        } else if (randomIndex == 1) {
-          tmp = RandomUtils.nextInt(0, 512);
-        } else {
-          tmp = RandomUtils.nextInt(0, 256);
-        }
-        //long userId = RandomUtils.nextInt(0, 10);
+
+       int  randomIndex = userGenerator.next() +1;
+       // int randomIndex = RandomUtils.nextInt(0, userNum);
+        int tmp = userMap.get((long)randomIndex).next();
+     /*
+        if (randomIndex % 3== 0) {
+          //tmp = RandomUtils.nextInt(0, 1023);
+          tmp = generator0.next();
+        } else if (randomIndex % 3 == 1) {
+          //tmp = RandomUtils.nextInt(0, 512);
+         tmp = generator1.next();
+         } else {
+          //tmp = RandomUtils.nextInt(0, 256);
+          tmp = generator2.next();
+
+        }*/
+       // tmp = new ZipfGenerator(1000/(randomIndex / 2 + 1), 0.5).next();
+        //tmp = RandomUtils.nextInt(0, 1000);
+        //long userId =
        // if (userId >= 2) {
        //   int tmp1 = RandomUtils.nextInt(0, 10);
        //   if (tmp1 != 0) {
@@ -106,7 +148,7 @@ public class MTLRUEvictor extends LRUEvictor {
         long userId = randomIndex;
         long begin = 1024 * 1024 * tmp;
         long end = begin + 1024 * 1024;
-        TmpCacheUnit unit = new TmpCacheUnit(mTestFileId, begin, end);
+        TmpCacheUnit unit = new TmpCacheUnit(userId, begin, end);
         access(userId, unit);
       }
       /*
@@ -136,7 +178,7 @@ public class MTLRUEvictor extends LRUEvictor {
       System.out.println("only one : ");
       System.out.println(mBaseEvictContext.computePartialHitRatio());
 
-
+      System.out.println(getFairnessIndex());
     }
   }
 
@@ -169,7 +211,7 @@ public class MTLRUEvictor extends LRUEvictor {
 
   private void evict() {
     for (long userId : baseEvictCotext.keySet()) {
-      LRUEvictContext mActualContext = actualEvictContext.get(userId);
+      BaseEvictContext mActualContext = actualEvictContext.get(userId);
       LRUEvictContext mBaseContext = baseEvictCotext.get(userId);
       double HRD = function(mBaseContext.computePartialHitRatio() - mActualContext.computePartialHitRatio());
       //System.out.println(HRD);
@@ -180,7 +222,7 @@ public class MTLRUEvictor extends LRUEvictor {
     double midCost = sampleRes.get((int)(mEvictRatio * sampleRes.size())).mCost;
     for (long userID : actualEvictContext.keySet()) {
 
-      LRUEvictContext mContext = actualEvictContext.get(userID);
+      BaseEvictContext mContext = actualEvictContext.get(userID);
       double nearstGap = Integer.MAX_VALUE;
       double midValue = 0;
       for (TmpCacheUnit unit : mContext.getCacheList()) {

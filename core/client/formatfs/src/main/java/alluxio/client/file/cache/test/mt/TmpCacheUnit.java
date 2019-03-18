@@ -1,4 +1,4 @@
-package alluxio.client.file.cache.test.MTTest;
+package alluxio.client.file.cache.test.mt;
 
 import io.netty.buffer.ByteBuf;
 
@@ -9,6 +9,16 @@ public class TmpCacheUnit  {
   private long mBegin, mEnd, mFileId;
   public long mClientIndex;
   public double mCost =0;
+  private int mAccessTime = 0;
+
+  public int getmAccessTime() {
+    return mAccessTime;
+  }
+
+  public TmpCacheUnit setmAccessTime(int mAccessTime) {
+    this.mAccessTime = mAccessTime;
+    return this;
+  }
 
   public TmpCacheUnit(long fileId, long begin, long end) {
     mBegin = begin;

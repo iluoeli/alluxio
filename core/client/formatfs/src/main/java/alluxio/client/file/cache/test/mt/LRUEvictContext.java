@@ -1,11 +1,9 @@
-package alluxio.client.file.cache.test.MTTest;
+package alluxio.client.file.cache.test.mt;
 
 import alluxio.client.file.cache.CacheInternalUnit;
 import alluxio.client.file.cache.CacheUnit;
 import alluxio.client.file.cache.ClientCacheContext;
 import alluxio.client.file.cache.TempCacheUnit;
-import alluxio.client.file.cache.test.LRUEvictor;
-import com.google.common.base.Preconditions;
 
 import java.util.HashSet;
 import java.util.LinkedList;
@@ -16,8 +14,6 @@ public class LRUEvictContext extends BaseEvictContext {
   LinkedList<TmpCacheUnit> mLRUList = new LinkedList<>();
   Set<TmpCacheUnit> accessSet = new HashSet<>();
 
-
-
   public LRUEvictContext(MTLRUEvictor test, ClientCacheContext cacheContext, long userId) {
     super(test, cacheContext, userId);
   }
@@ -26,7 +22,7 @@ public class LRUEvictContext extends BaseEvictContext {
     while (mCacheSize > mCacheCapacity ) {
       LinkedList<TmpCacheUnit> lruList = mLRUList;
       TmpCacheUnit deleteUnit = lruList.pollFirst();
-      CacheUnit res = mCacheContext.getCache(mTestFileId, mTestFileLength, deleteUnit.getBegin(), deleteUnit.getEnd(), unlockTask);
+      CacheUnit res = mCacheContext.getCache(deleteUnit.getFileId(), mTestFileLength, deleteUnit.getBegin(), deleteUnit.getEnd(), unlockTask);
       if (res.isFinish()) {
         mCacheSize -= res.getSize();
         mCacheContext.delete((CacheInternalUnit) res);
@@ -45,9 +41,6 @@ public class LRUEvictContext extends BaseEvictContext {
 
 
   public long access(TmpCacheUnit unit) {
-    long newSize = 0;
-    CacheUnit res = mCacheContext.getCache(mTestFileId, mTestFileLength, unit.getBegin(), unit.getEnd(), unlockTask);
-    mVisitSize += unit.getSize();
     if (!accessSet.contains(unit)) {
       mLRUList.addLast(unit);
       accessSet.add(unit);
@@ -55,37 +48,16 @@ public class LRUEvictContext extends BaseEvictContext {
       mLRUList.remove(unit);
       mLRUList.addLast(unit);
     }
-    if (!res.isFinish()) {
-      TempCacheUnit unit1 = (TempCacheUnit)res;
-      long missSize = mCacheContext.computeIncrese(unit1);
-      mHitSize += (unit.getSize() - missSize);
-      mCacheContext.addCache(unit1);
-      newSize += missSize;
-      mCacheSize += newSize;
-      mStoreSet.add(unit);
-    } else {
-      mHitSize += unit.getSize();
-    }
-    //test();
-    return newSize;
+    return access0(unit);
   }
+
+
   public long remove(TmpCacheUnit deleteUnit) {
-    CacheUnit unit = mCacheContext.getCache(deleteUnit.getFileId(), mTestFileLength, deleteUnit.getBegin(),
-      deleteUnit.getEnd(), unlockTask);
-    long res = 0;
-    if (unit.isFinish()) {
-      mCacheContext.delete((CacheInternalUnit) unit);
-      if (mStoreSet.contains(deleteUnit)) {
-        mStoreSet.remove(deleteUnit);
-        mCacheSize -= deleteUnit.getSize();
-      }
-      res += unit.getSize();
-    }
     if (accessSet.contains(deleteUnit)) {
       mLRUList.remove(deleteUnit);
       accessSet.remove(deleteUnit);
     }
-    return res;
+    return remove0(deleteUnit);
   }
 
   public void test () {
@@ -98,6 +70,7 @@ public class LRUEvictContext extends BaseEvictContext {
     }
   }
 
+  @Override
   public void removeByShare(TmpCacheUnit deleteUnit) {
     if (accessSet.contains(deleteUnit)) {
       mLRUList.remove(deleteUnit);

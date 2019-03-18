@@ -1,4 +1,4 @@
-package alluxio.client.file.cache.test.MTTest;
+package alluxio.client.file.cache.test.mt;
 
 import alluxio.client.file.cache.*;
 import alluxio.client.file.cache.test.LRUEvictor;
