@@ -46,6 +46,7 @@ public abstract class BaseEvictContext {
     mCacheContext = cacheContext;
     mUserId = userId;
     mtlruEvictor = test;
+    System.out.println(mTestFileLength);
   }
 
   public BaseEvictContext resetCapacity(long capacitySize) {
@@ -76,9 +77,12 @@ public abstract class BaseEvictContext {
     } else {
       mHitSize += unit.getSize();
     }
+   // shareCount(unit);
 
     return newSize;
   }
+
+
 
   long remove0(TmpCacheUnit deleteUnit) {
     CacheUnit unit = mCacheContext.getCache(deleteUnit.getFileId(), mTestFileLength, deleteUnit.getBegin(),

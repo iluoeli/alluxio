@@ -34,6 +34,7 @@ public class LinkedFileBucket {
       BUCKET_LENGTH++;
     }
     mCacheIndex0 = new LinkBucket[BUCKET_LENGTH];
+
     initBucketLock();
   }
 

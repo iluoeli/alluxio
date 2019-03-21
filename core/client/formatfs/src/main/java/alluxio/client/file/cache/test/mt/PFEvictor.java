@@ -47,13 +47,11 @@ public class PFEvictor extends MTLRUEvictor {
           tmpSum += context1.mAccessMap.get(tmp);
         }
       }
-      res += Math.log(tmpSum);
-      //res += tmpSum;
+     // res += Math.log(tmpSum);
+      res += tmpSum;
     }
-    //long visitSize = actualEvictContext.get(userId).mVisitSize;
-    //double usedRatio = (double)visitSize / (double)mAccessSize;
-    return res ;
-            /// usedRatio == 0? 0.0000001 : usedRatio;
+    double usedRatio = (double) actualEvictContext.get(userId).mCacheSize / (double)cacheSize;
+    return res / (usedRatio == 0? 0.0000001 : usedRatio);
   }
 
   public void evict() {

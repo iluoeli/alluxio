@@ -22,16 +22,25 @@ public class MTLRUEvictor extends LRUEvictor {
   protected long mHitSize;
   public long mLimit = 10 * 1024 * 1024;
   private int userNum = 3;
+  public long mShareVisitSize = 0;
   public BaseEvictContext mBaseEvictContext = new LRUEvictContext(this, new ClientCacheContext(false), -1);
 
   public static Map<Long, Generator> userMap = new HashMap<>();
+  public Map<TmpCacheUnit, Set<Long>> mShareSet = new HashMap<>();
+  public List<TmpCacheUnit> mAccessCollecter = new LinkedList<>();
 
   static {
     userMap.put(1L, new LRUGenerator(1000));
     userMap.put(2L, new ZipfGenerator(1000, 0.3));
     userMap.put(3L, new ScanGenerator(1000));
   }
-
+  public void shareCount(TmpCacheUnit unit, long userId) {
+    if (!mShareSet.containsKey(unit)) {
+      mShareSet.put(unit, new HashSet<Long>());
+    }
+    mShareSet.get(unit).add(userId);
+    mAccessCollecter.add(unit);
+  }
 
   public void checkRemoveByShare(TmpCacheUnit unit, long userID) {
     for (long userId : actualEvictContext.keySet()) {
@@ -101,10 +110,13 @@ public class MTLRUEvictor extends LRUEvictor {
     //LRUGenerator generator0 = new LRUGenerator(1024);
     //LRUGenerator generator1 = new LRUGenerator(512);
    // LRUGenerator generator2 = new LRUGenerator(256);
-    ScanGenerator userGenerator = new ScanGenerator(3);
-
-    for (int i = 0; i < 10; i ++) {
+    ZipfGenerator userGenerator = new ZipfGenerator(3, 1);
+    ZipfGenerator fileIDGenerator = new ZipfGenerator(3, 9);
+    LRUGenerator generator = new LRUGenerator(200);
+    for (int i = 0; i < 1; i ++) {
       System.out.println("==================================================");
+      mAccessCollecter.clear();
+      mShareSet.clear();
      // mAccessSize = mHitSize = 0;
       if (i == 10) {
         for (long userId : actualEvictContext.keySet()) {
@@ -116,41 +128,50 @@ public class MTLRUEvictor extends LRUEvictor {
       }
       mBaseEvictContext.initAccessRecord();
       boolean reverse = false;
-      for (int j = 0; j < 6000; j ++) {
+      for (int j = 0; j < 1000; j ++) {
         if (j % 3 == 0) {
           evictCheck();
         }
+        int randomIndex = RandomUtils.nextInt(0, 3);
+        if (randomIndex < 2) {
+          int randomIndex1 = RandomUtils.nextInt(0, 2);
+          if (randomIndex1 == 0) {
+            randomIndex = 2;
+          }
+        }
 
-       int  randomIndex = userGenerator.next() +1;
-       // int randomIndex = RandomUtils.nextInt(0, userNum);
-        int tmp = userMap.get((long)randomIndex).next();
-     /*
-        if (randomIndex % 3== 0) {
-          //tmp = RandomUtils.nextInt(0, 1023);
-          tmp = generator0.next();
+        //  randomIndex = userGenerator.next() +1;
+        randomIndex = RandomUtils.nextInt(0, 2);
+        int tmp;
+        //userMap.get((long)randomIndex).next();
+
+        if (randomIndex % 3 == 0) {
+          tmp = RandomUtils.nextInt(0, 200);
+          // tmp = generator0.next();
         } else if (randomIndex % 3 == 1) {
-          //tmp = RandomUtils.nextInt(0, 512);
-         tmp = generator1.next();
-         } else {
-          //tmp = RandomUtils.nextInt(0, 256);
-          tmp = generator2.next();
-
-        }*/
-       // tmp = new ZipfGenerator(1000/(randomIndex / 2 + 1), 0.5).next();
+          tmp = RandomUtils.nextInt(0, 200);
+          //tmp = generator1.next();
+        } else {
+          tmp = RandomUtils.nextInt(0, 200);
+          //tmp = generator2.next();
+        }
+         tmp = generator.next();
         //tmp = RandomUtils.nextInt(0, 1000);
         //long userId =
-       // if (userId >= 2) {
-       //   int tmp1 = RandomUtils.nextInt(0, 10);
-       //   if (tmp1 != 0) {
-       //     userId = RandomUtils.nextInt(0, 5);
-       //   }
-       // }
+        // if (userId >= 2) {
+        //   int tmp1 = RandomUtils.nextInt(0, 10);
+        //   if (tmp1 != 0) {
+        //     userId = RandomUtils.nextInt(0, 5);
+        //   }
+        // }
         long userId = randomIndex;
         long begin = 1024 * 1024 * tmp;
         long end = begin + 1024 * 1024;
-        TmpCacheUnit unit = new TmpCacheUnit(userId, begin, end);
+        long TestFileId = fileIDGenerator.next();
+        TmpCacheUnit unit = new TmpCacheUnit(1, begin, end);
         access(userId, unit);
-      }
+        shareCount(unit, userId);
+
       /*
       for (int j = 0; j < 3072; j ++) {
         if (j % 3 == 0) {
@@ -165,20 +186,44 @@ public class MTLRUEvictor extends LRUEvictor {
         access(userId, unit);
       }
      */
-      System.out.println("all : " + (double)mHitSize / (double)mAccessSize);
-      System.out.println("actual : ");
-      for (long userId : actualEvictContext.keySet()) {
-        System.out.println(userId + " : " + actualEvictContext.get(userId).computePartialHitRatio());
-      }
-      System.out.println("base : ");
-      for (long userId : baseEvictCotext.keySet()) {
-        System.out.println(userId + " : " + baseEvictCotext.get(userId).computePartialHitRatio());
-      }
+        if (j % 10 == 0) {
+          //System.out.println("all : " + (double) mHitSize / (double) mAccessSize);
 
-      System.out.println("only one : ");
-      System.out.println(mBaseEvictContext.computePartialHitRatio());
+          System.out.println("actual : ");
+          for (long userId1 : actualEvictContext.keySet()) {
+            System.out.println(userId1 + " : " + actualEvictContext.get(userId1).computePartialHitRatio());
+          }
+          /*
+          System.out.println("base : ");
+          for (long userId1 : baseEvictCotext.keySet()) {
+            System.out.println(userId1 + " : " + baseEvictCotext.get(userId1).computePartialHitRatio());
+          }
 
-      System.out.println(getFairnessIndex());
+          System.out.println("only one : ");
+          System.out.println(mBaseEvictContext.computePartialHitRatio());
+          //System.out.println("access share ratio : " + (double)mShareVisitSize / (double)mAccessSize );
+          long shareSize = 0;
+          for (TmpCacheUnit u : mShareSet.keySet()) {
+            Set<Long> s = mShareSet.get(u);
+            if (s.size() > 1) {
+              shareSize++;
+            }
+          }
+          System.out.println("storage share ratio : " + (double) shareSize / (double) mShareSet.size());
+          shareSize = 0;
+          long acc = 0;
+          for (TmpCacheUnit uu : mAccessCollecter) {
+            if (mShareSet.get(uu).size() > 1) {
+              shareSize += uu.getSize();
+            }
+            acc += uu.getSize();
+          }
+
+          System.out.println("visit share ratio :" + (double) shareSize / (double) acc);
+
+          System.out.println(getFairnessIndex());*/
+        }
+      }
     }
   }
 

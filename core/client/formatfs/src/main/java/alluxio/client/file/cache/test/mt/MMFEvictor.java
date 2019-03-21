@@ -11,15 +11,13 @@ public class MMFEvictor extends MTLRUEvictor {
   @Override
   public void access(long userId, TmpCacheUnit unit) {
     if (!actualEvictContext.containsKey(userId)) {
-      if (userId == 1) {
+      //if (userId == 1) {
         actualEvictContext.put(userId, new LRUEvictContext(this, mContext, userId));
-      } else if (userId == 2) {
-        actualEvictContext.put(userId, new LFUEvictContext(this, mContext, userId));
-      } else {
-        actualEvictContext.put(userId, new LIRSEvictContext(this, mContext, userId, 330));
-      }
-
-
+     // } else if (userId == 2) {
+     //   actualEvictContext.put(userId, new LFUEvictContext(this, mContext, userId));
+     // } else {
+     //   actualEvictContext.put(userId, new LIRSEvictContext(this, mContext, userId, 330));
+     // }
     }
     long actualNew = actualEvictContext.get(userId).access(unit);
 
@@ -39,8 +37,6 @@ public class MMFEvictor extends MTLRUEvictor {
     }
     baseEvictCotext.get(userId).accessByShare(unit, mContext);
     baseEvictCotext.get(userId).evict();
-
-
   }
 
   public void evict() {
