@@ -18,12 +18,7 @@ public class LFUEvictContext extends BaseEvictContext {
     });
   }
 
-
-  public List<TmpCacheUnit> getCacheList() {
-    return new ArrayList<>(mVisitQueue);
-  }
-
-  public long access(TmpCacheUnit unit) {
+  public void fakeAccess(TmpCacheUnit unit) {
     if (mAccessMap.containsKey(unit)) {
       mVisitQueue.remove(unit);
       mVisitQueue.add(unit.setmAccessTime(mAccessMap.get(unit) +1));
@@ -32,7 +27,11 @@ public class LFUEvictContext extends BaseEvictContext {
       mVisitQueue.add(unit.setmAccessTime(1));
     }
     mAccessMap.put(unit, mAccessMap.getOrDefault(mAccessMap.get(unit), 1));
-    return access0(unit);
+  }
+
+
+  public List<TmpCacheUnit> getCacheList() {
+    return new ArrayList<>(mVisitQueue);
   }
 
   public long remove(TmpCacheUnit unit){
@@ -56,15 +55,12 @@ public class LFUEvictContext extends BaseEvictContext {
     }
   }
 
+
   @Override
   public void removeByShare(TmpCacheUnit deleteUnit) {
     if (mAccessMap.containsKey(deleteUnit)) {
       mAccessMap.remove(deleteUnit);
       mVisitQueue.remove(deleteUnit);
-      if (mStoreSet.contains(deleteUnit)) {
-        mStoreSet.remove(deleteUnit);
-        mCacheSize -= deleteUnit.getSize();
-      }
     }
   }
 }

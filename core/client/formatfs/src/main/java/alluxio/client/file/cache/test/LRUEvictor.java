@@ -12,7 +12,7 @@ public class LRUEvictor {
   public ClientCacheContext mContext;
   private Map<CacheInternalUnit, Set<BaseCacheUnit>> mAccessMap = new HashMap<>();
   public long mTestFileId = 1;
-  public long mTestFileLength = 1024 * 1024 * 200;
+  public long mTestFileLength = 1024 * 1024 * 100;
   protected Set<BaseCacheUnit> visitList = new HashSet<>();
   public UnlockTask unlockTask = new UnlockTask();
   public long cacheSize = 1024 * 1024 * 100;

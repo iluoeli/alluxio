@@ -234,7 +234,7 @@ public class CacheInternalUnit extends LinkNode<CacheInternalUnit> implements Ca
 
   @Override
   public String toString() {
-    return "finish begin: " + mBegin + "end: " + mEnd;
+    return "finish begin: " + mBegin + "end: " + mEnd + " file id : "+ mFileId;
   }
 
   private void reset(int newBegin, int newEnd) {

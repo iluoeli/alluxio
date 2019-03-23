@@ -54,13 +54,34 @@ public class PFEvictor extends MTLRUEvictor {
     return res / (usedRatio == 0? 0.0000001 : usedRatio);
   }
 
+  public double  computePFValueWhenCheat(long userId) {
+    LFUEvictContext context = (LFUEvictContext)actualEvictContext.get(userId);
+    TmpCacheUnit needDelete = context.getEvictUnit();
+    if (needDelete == null) {
+      return Integer.MIN_VALUE ;
+    }
+    double res = 0;
+    for(long tmpId : actualEvictContext.keySet()) {
+      LFUEvictContext context1 = (LFUEvictContext)actualEvictContext.get(tmpId);
+      double tmpSum = 0;
+      for (TmpCacheUnit tmp : context1.mAccessMap.keySet()) {
+        if (!tmp.equals(needDelete)) {
+          tmpSum += context1.mAccessMap.get(tmp);
+        }
+      }
+       res += Math.log(tmpSum);
+      //res += tmpSum;
+    }
+    return res;
+  }
+
   public void evict() {
     while (actualSize > cacheSize) {
       double maxValue = Integer.MIN_VALUE;
       long maxCostId = -1;
       //System.out.println("============");
       for (long userId : actualEvictContext.keySet()) {
-        double tmpCost =  computePFValue(userId);
+        double tmpCost =  computePFValueWhenCheat(userId);
         if (tmpCost > maxValue) {
           maxValue = tmpCost;
           maxCostId = userId;
@@ -75,7 +96,7 @@ public class PFEvictor extends MTLRUEvictor {
 
   public static void main(String[] args) {
     PFEvictor test = new PFEvictor(new ClientCacheContext(false));
-    test.test();
+    test.testCheatAccess();
   }
 
 }

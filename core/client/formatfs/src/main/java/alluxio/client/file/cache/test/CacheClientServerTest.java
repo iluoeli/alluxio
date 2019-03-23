@@ -4,7 +4,7 @@ import alluxio.AlluxioURI;
 import alluxio.client.file.CacheFileSystem;
 import alluxio.client.file.FileSystem;
 import alluxio.client.file.cache.*;
-import alluxio.client.file.cache.remote.netty.CacheClientContext;
+import alluxio.client.file.cache.remote.netty.CacheClient;
 import alluxio.client.file.cache.remote.netty.CacheServer;
 import alluxio.client.file.cache.submodularLib.cacheSet.CacheSet;
 import io.netty.buffer.ByteBuf;
@@ -42,8 +42,8 @@ public class CacheClientServerTest extends testRead {
     long begin = System.currentTimeMillis();
     readTime = 0;
     for (int i = 0; i < 1024 ; i++) {
-      List<ByteBuf> l = CacheClientContext.INSTANCE.read(fileId, 0,  1024 * 1024);
-      CacheClientContext.INSTANCE.read0(l, b, 0, 10);
+      List<ByteBuf> l = CacheClient.INSTANCE.read(fileId, 0,  1024 * 1024);
+      CacheClient.INSTANCE.read0(l, b, 0, 10);
       for (ByteBuf ll : l) {
         ll.release();
       }

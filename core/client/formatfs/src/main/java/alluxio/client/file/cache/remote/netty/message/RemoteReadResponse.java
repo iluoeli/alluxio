@@ -13,11 +13,13 @@ import java.util.List;
 
 public class RemoteReadResponse extends RPCMessage implements PayloadMessage {
   private List<ByteBuf> mData;
+  private int mPos;
   private int mLength;
 
-  public RemoteReadResponse(long messageId, List<ByteBuf> data, int length) {
+  public RemoteReadResponse(long messageId, List<ByteBuf> data, int length, int pos) {
     super(messageId);
     mData = data;
+    mPos = pos;
     mLength = length;
   }
 
@@ -29,21 +31,27 @@ public class RemoteReadResponse extends RPCMessage implements PayloadMessage {
   @Override
   public void encode(ByteBuf out) {
     out.writeInt(mLength);
+    out.writeInt(mPos);
     encodeMessageId(out);
+  }
+
+  public int getPos() {
+    return mPos;
   }
 
   @Override
   public int getEncodedLength() {
-    return Integer.BYTES + mLength + getMessageIdEncodedlength() ;
+    return Integer.BYTES * 2 + mLength + getMessageIdEncodedlength() ;
   }
 
   public static RemoteReadResponse decode(ByteBuf in) throws IOException {
     int length = in.readInt();
+    int pos = in.readInt();
     long messageId = decodeMessageId(in);
     ByteBuf data = decodeData(in, length);
     List<ByteBuf> l = new ArrayList<>();
     l.add(data);
-    return new RemoteReadResponse(messageId, l, length);
+    return new RemoteReadResponse(messageId, l, length, pos);
   }
 
   @Override

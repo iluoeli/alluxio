@@ -74,7 +74,7 @@ public class FairMemEvictor extends MTLRUEvictor {
     }
 
     public long getUsedSize() {
-      return mEvictContext.mCacheSize;
+      return (long)mEvictContext.mCacheSize;
     }
 
     public long getCacheCapacity() {
@@ -90,7 +90,7 @@ public class FairMemEvictor extends MTLRUEvictor {
     }
 
     public void resetCapacity() {
-      mEvictContext.mCacheCapacity = mEvictContext.mCacheSize;
+      mEvictContext.mCacheCapacity = (long)mEvictContext.mCacheSize;
     }
 
     public void reserCapacity(long resetSize) {

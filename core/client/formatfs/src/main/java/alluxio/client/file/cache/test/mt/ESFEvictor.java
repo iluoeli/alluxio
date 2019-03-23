@@ -20,6 +20,10 @@ public class ESFEvictor extends MTLRUEvictor {
     mAccessSize += unit.getSize();
     mHitSize += unit.getSize() - actualNew;
     actualSize += actualNew;
+    if (actualSize > cacheSize) {
+      evict();
+    }
+
 
     if (!baseEvictCotext.containsKey(userId)) {
       LRUEvictContext base = new LRUEvictContext(this, new ClientCacheContext(false), userId);
@@ -28,16 +32,19 @@ public class ESFEvictor extends MTLRUEvictor {
     }
     baseEvictCotext.get(userId).accessByShare(unit, mContext);
     baseEvictCotext.get(userId).evict();
-    if (actualSize > cacheSize) {
-      evict();
-    }
-
-    mBaseEvictContext.access(unit);
-    mBaseEvictContext.evict();
   }
 
   private double getHRDCost(double HRD, long userId) {
-    return (HRD) * 100 * ((actualEvictContext.get(userId).mCacheSize) / cacheSize);
+    System.out.println(userId + " " + HRD);
+    return (HRD) * 100  / ((double)(actualEvictContext.get(userId).mCacheSize) / (double)cacheSize);
+  }
+
+  private double getHRDCostWhenCheat(double HRD, long userId) {
+    double usedRatio = ((double)(actualEvictContext.get(userId).mCacheSize) / (double)cacheSize);
+    if(usedRatio == 0) {
+      return 0;
+    }
+    return (HRD) * 100  / usedRatio;
   }
 
   public void evict() {
@@ -48,16 +55,16 @@ public class ESFEvictor extends MTLRUEvictor {
       for (long userId : actualEvictContext.keySet()) {
         double actualHitRatio = actualEvictContext.get(userId).computePartialHitRatio();
         double baseHitRatio = baseEvictCotext.get(userId).computePartialHitRatio();
-        double HRDCost = getHRDCost(baseHitRatio - actualHitRatio, userId);
-      //  System.out.println(userId  +" " + actualHitRatio + " "+baseHitRatio + " " +HRDCost);
-        if (HRDCost < minHRDCost && actualEvictContext.get(userId).mCacheSize > 0 ){
+        double HRDCost = getHRDCostWhenCheat(baseHitRatio - actualHitRatio, userId);
+        //System.out.println(userId  +" " + actualHitRatio + " "+baseHitRatio + " " +HRDCost);
+       // System.out.println(userId + " cache size " +(actualEvictContext.get(userId).mCacheSize) / (1024 * 1024) + " || " + cacheSize/ ( 1024 * 1024));
+        if (HRDCost < minHRDCost && actualEvictContext.get(userId).mCacheSize > 0
+                && actualEvictContext.get(userId).getEvictUnit()!= null){
           minHRDCost = HRDCost;
           minCostUserId = userId;
         }
       }
-
-      //System.out.println(minCostUserId);
-
+      //System.out.println(minCostUserId+ " " + actualEvictContext.get(minCostUserId).mCacheSize/ (1024 * 1024));
       TmpCacheUnit unit = actualEvictContext.get(minCostUserId).getEvictUnit();
       actualSize -=  actualEvictContext.get(minCostUserId).remove(unit);
       checkRemoveByShare(unit, minCostUserId);
@@ -67,6 +74,6 @@ public class ESFEvictor extends MTLRUEvictor {
 
   public static void main(String [] args) {
     ESFEvictor esfTest = new ESFEvictor(new ClientCacheContext(false));
-    esfTest.test();
+    esfTest.testCheatAccess();
   }
 }

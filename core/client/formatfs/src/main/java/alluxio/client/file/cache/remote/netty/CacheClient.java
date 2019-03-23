@@ -10,15 +10,10 @@ import io.netty.buffer.ByteBuf;
 import io.netty.channel.*;
 import io.netty.channel.epoll.EpollDomainSocketChannel;
 import io.netty.channel.epoll.EpollEventLoopGroup;
-import io.netty.channel.nio.NioEventLoopGroup;
-import io.netty.channel.socket.SocketChannel;
-import io.netty.channel.socket.nio.NioSocketChannel;
 import io.netty.channel.unix.DomainSocketAddress;
 import io.netty.channel.unix.DomainSocketChannel;
 
-import java.net.InetAddress;
 import java.net.SocketAddress;
-import java.net.UnknownHostException;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -26,15 +21,15 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ThreadFactory;
 
-public final class CacheClientContext {
-  public static final CacheClientContext INSTANCE = new CacheClientContext();
+public final class CacheClient {
+  public static final CacheClient INSTANCE = new CacheClient();
   private Channel mChannel = null;
   private Map<Long, Response> mDataMap = new ConcurrentHashMap<>();
   private final String mServerHostName = "localhost";
   private final int mServerPort = 8080;
   //private boolean supportDomainSocket = true;
 
-  private CacheClientContext() {
+  private CacheClient() {
 
   }
 
@@ -118,14 +113,14 @@ public final class CacheClientContext {
 
     @Override
     protected void channelRead0(ChannelHandlerContext channelHandlerContext, RPCMessage rpcMessage) throws Exception {
-      CacheClientServerTest.readTime += (System.currentTimeMillis() - CacheClientServerTest
-        .beginTime);
 
       switch (rpcMessage.getType()) {
         case REMOTE_READ_RESPONSE:
           List<ByteBuf> data =((RemoteReadResponse) rpcMessage).getPayload();
-          CacheClientContext.INSTANCE.addData(((RemoteReadResponse) rpcMessage).getMessageId()
+          CacheClient.INSTANCE.addData(((RemoteReadResponse) rpcMessage).getMessageId()
             , data);
+        case REMOTE_READ_FINISH_RESPONSE:
+
           break;
         default:
           throw new IllegalArgumentException("Illegal received message type " + rpcMessage.getType());

@@ -19,6 +19,7 @@ public class LRUEvictContext extends BaseEvictContext {
   }
 
   public void evict() {
+
     while (mCacheSize > mCacheCapacity ) {
       LinkedList<TmpCacheUnit> lruList = mLRUList;
       TmpCacheUnit deleteUnit = lruList.pollFirst();
@@ -39,8 +40,7 @@ public class LRUEvictContext extends BaseEvictContext {
     return mLRUList.peekFirst();
   }
 
-
-  public long access(TmpCacheUnit unit) {
+  public void fakeAccess(TmpCacheUnit unit) {
     if (!accessSet.contains(unit)) {
       mLRUList.addLast(unit);
       accessSet.add(unit);
@@ -48,9 +48,7 @@ public class LRUEvictContext extends BaseEvictContext {
       mLRUList.remove(unit);
       mLRUList.addLast(unit);
     }
-    return access0(unit);
   }
-
 
   public long remove(TmpCacheUnit deleteUnit) {
     if (accessSet.contains(deleteUnit)) {
@@ -75,10 +73,6 @@ public class LRUEvictContext extends BaseEvictContext {
     if (accessSet.contains(deleteUnit)) {
       mLRUList.remove(deleteUnit);
       accessSet.remove(deleteUnit);
-      if (mStoreSet.contains(deleteUnit)) {
-        mStoreSet.remove(deleteUnit);
-        mCacheSize -= deleteUnit.getSize();
-      }
     }
   }
 

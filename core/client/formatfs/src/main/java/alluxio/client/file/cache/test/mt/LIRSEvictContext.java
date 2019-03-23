@@ -23,45 +23,43 @@ public class LIRSEvictContext extends BaseEvictContext {
     return res;
   }
 
-  public long access(TmpCacheUnit unit) {
-     if (!mAccessSet.contains(unit)) {
-       LIRSCacheUnit unit1 = new LIRSCacheUnit(unit);
-        if (LIRList.size() < mLirSize) {
-          unit1.setStatus(Status.LIR_RESIDENT);
-          LIRList.addLast(unit1);
-        } else {
-          unit1.setStatus(Status.HIR_RESIDENT);
-          HIRlist.addLast(unit1);
+  public void fakeAccess(TmpCacheUnit unit) {
+    if (!mAccessSet.contains(unit)) {
+      LIRSCacheUnit unit1 = new LIRSCacheUnit(unit);
+      if (LIRList.size() < mLirSize) {
+        unit1.setStatus(Status.LIR_RESIDENT);
+        LIRList.addLast(unit1);
+      } else {
+        unit1.setStatus(Status.HIR_RESIDENT);
+        HIRlist.addLast(unit1);
+      }
+      mAccessSet.add(unit);
+    } else {
+      if (LIRList.contains(unit)) {
+        LIRSCacheUnit unit1 = new LIRSCacheUnit(unit);
+        HIRlist.remove(unit1);
+        unit1.setStatus(Status.LIR_RESIDENT);
+        LIRList.remove(unit1);
+        LIRList.addLast(unit1);
+        int index = 0;
+        while (LIRList.size() >= mLirSize && index < LIRList.size()) {
+          LIRSCacheUnit unit2 = LIRList.get(index);
+          if (unit2.getStatus() == Status.LIR_RESIDENT) {
+            unit2.setStatus(Status.HIR_RESIDENT);
+            LIRList.remove(index);
+            HIRlist.addLast(unit2);
+          } else  {
+            LIRList.remove(index);
+          }
+          index ++;
         }
-       mAccessSet.add(unit);
-     } else {
-       if (LIRList.contains(unit)) {
-         LIRSCacheUnit unit1 = new LIRSCacheUnit(unit);
-         HIRlist.remove(unit1);
-         unit1.setStatus(Status.LIR_RESIDENT);
-         LIRList.remove(unit1);
-         LIRList.addLast(unit1);
-         int index = 0;
-         while (LIRList.size() >= mLirSize && index < LIRList.size()) {
-           LIRSCacheUnit unit2 = LIRList.get(index);
-           if (unit2.getStatus() == Status.LIR_RESIDENT) {
-             unit2.setStatus(Status.HIR_RESIDENT);
-             LIRList.remove(index);
-             HIRlist.addLast(unit2);
-           } else  {
-             LIRList.remove(index);
-           }
-           index ++;
-         }
-       } else {
-         LIRSCacheUnit unit1 = new LIRSCacheUnit(unit);
-         unit1.setStatus(Status.HIR_RESIDENT);
-         LIRList.addLast(unit1);
-         HIRlist.addLast(unit1);
-       }
-     }
-
-    return access0(unit);
+      } else {
+        LIRSCacheUnit unit1 = new LIRSCacheUnit(unit);
+        unit1.setStatus(Status.HIR_RESIDENT);
+        LIRList.addLast(unit1);
+        HIRlist.addLast(unit1);
+      }
+    }
   }
 
   public long remove(TmpCacheUnit unit){
@@ -96,10 +94,6 @@ public class LIRSEvictContext extends BaseEvictContext {
   public void removeByShare(TmpCacheUnit deleteUnit) {
     if (mAccessSet.contains(deleteUnit)) {
       remove(deleteUnit);
-      if (mStoreSet.contains(deleteUnit)) {
-        mStoreSet.remove(deleteUnit);
-        mCacheSize -= deleteUnit.getSize();
-      }
     }
   }
 

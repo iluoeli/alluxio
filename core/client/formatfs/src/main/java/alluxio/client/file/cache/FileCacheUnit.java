@@ -39,7 +39,7 @@ public class FileCacheUnit {
     this.mContext = mContext;
     use_bucket = mContext.USE_INDEX_0;
     cacheList = new DoubleLinkedList<>(new CacheInternalUnit(0, 0, -1));
-    if (use_bucket) {
+     if (use_bucket) {
       mBuckets = new LinkedFileBucket(length, fileId, mContext);
     }
     this.mLockManager = mContext.getLockManager();
@@ -399,7 +399,6 @@ public class FileCacheUnit {
       unit1.before = unit1.after = null;
       unit1 = null;
     }
-
     cacheList.insertBetween(result, result.before, result.after);
     if (use_bucket) {
       mBuckets.add(result);

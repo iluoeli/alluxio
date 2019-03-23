@@ -116,7 +116,8 @@ public abstract class RPCMessage implements EncodedMessage {
    */
   public enum Type implements EncodedMessage {
     REMOTE_READ_REQUEST(0),
-    REMOTE_READ_RESPONSE(1);
+    REMOTE_READ_RESPONSE(1),
+    REMOTE_READ_FINISH_RESPONSE(2);
 
     private final int mId;
 
@@ -144,6 +145,8 @@ public abstract class RPCMessage implements EncodedMessage {
           return REMOTE_READ_REQUEST;
         case 1:
           return REMOTE_READ_RESPONSE;
+        case 2:
+          return REMOTE_READ_FINISH_RESPONSE;
         default:
           throw new IllegalArgumentException("No corresponding RPC message type for " + id);
       }

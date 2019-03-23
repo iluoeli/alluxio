@@ -8,6 +8,9 @@ public class MMFEvictor extends MTLRUEvictor {
     super(context);
   }
 
+
+
+
   @Override
   public void access(long userId, TmpCacheUnit unit) {
     if (!actualEvictContext.containsKey(userId)) {
@@ -20,7 +23,6 @@ public class MMFEvictor extends MTLRUEvictor {
      // }
     }
     long actualNew = actualEvictContext.get(userId).access(unit);
-
     mAccessSize += unit.getSize();
     mHitSize += unit.getSize() - actualNew;
     if (actualNew > 0) {
@@ -37,15 +39,16 @@ public class MMFEvictor extends MTLRUEvictor {
     }
     baseEvictCotext.get(userId).accessByShare(unit, mContext);
     baseEvictCotext.get(userId).evict();
+
   }
 
   public void evict() {
     while (actualSize > cacheSize) {
-      long maxSize = 0;
+      double maxSize = 0;
       long maxUserId = -1;
       for (long userId : actualEvictContext.keySet()) {
         BaseEvictContext context = actualEvictContext.get(userId);
-        long usedSize = context.mCacheSize;
+        double usedSize = context.mCacheSize;
         if (usedSize > maxSize) {
           maxSize = usedSize;
           maxUserId = userId;
@@ -59,6 +62,6 @@ public class MMFEvictor extends MTLRUEvictor {
 
   public static void main(String[] args) {
     MMFEvictor test = new MMFEvictor(new ClientCacheContext(false));
-    test.test();
+    test.testCheatAccess();
   }
 }

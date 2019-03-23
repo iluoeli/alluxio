@@ -25,7 +25,6 @@ public class ServerClientMessageEncoder extends MessageToMessageEncoder<RPCMessa
 
   @Override
   public void encode(ChannelHandlerContext ctx, RPCMessage msg, List<Object> out) throws Exception {
-    long beginTime = System.currentTimeMillis();
     RPCMessage.Type type = msg.getType();
     int frameLength = Ints.BYTES; // the frame length itself consists of 4 bytes
     frameLength += type.getEncodedLength();
@@ -52,7 +51,5 @@ public class ServerClientMessageEncoder extends MessageToMessageEncoder<RPCMessa
     if (hasPayload) {
       out.addAll(payload);
     }
-    CacheClientServerTest.beginTime = System.currentTimeMillis();
-
   }
 }

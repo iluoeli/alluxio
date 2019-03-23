@@ -7,7 +7,10 @@ import alluxio.client.file.cache.CacheUnit;
 import alluxio.client.file.cache.ClientCacheContext;
 import alluxio.client.file.cache.OnlyReadLockTask;
 import alluxio.client.file.cache.TempCacheUnit;
+import alluxio.client.file.cache.remote.FileCacheContext;
+import alluxio.client.file.cache.remote.FileCacheEntity;
 import alluxio.client.file.cache.remote.netty.message.RPCMessage;
+import alluxio.client.file.cache.remote.netty.message.RemoteReadFinishResponse;
 import alluxio.client.file.cache.remote.netty.message.RemoteReadRequest;
 import alluxio.client.file.cache.remote.netty.message.RemoteReadResponse;
 import alluxio.client.file.cache.test.CacheClientServerTest;
@@ -34,20 +37,22 @@ import java.io.IOException;
 import java.net.InetAddress;
 import java.net.SocketAddress;
 import java.util.ArrayList;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.concurrent.ThreadFactory;
 
 public class CacheServer {
   private String mHostname;
   private int mPort;
-  private ClientCacheContext mCacheContext;
+  private FileCacheContext mCacheContext;
   private ChannelHandler mChannelHandler;
+  private int SentLimit;
 
-  public CacheServer(String hostName, int port, ClientCacheContext cacheContext) {
+  public CacheServer(String hostName, int port, FileCacheContext cacheContext) {
     mHostname = hostName;
     mPort = port;
     mCacheContext = cacheContext;
-    mChannelHandler = new CacheServerChannelHandler(mCacheContext);
+    mChannelHandler = new CacheServerChannelHandler();
   }
 
   public void launch() throws Exception {
@@ -130,10 +135,8 @@ public class CacheServer {
 
   public class CacheServerChannelHandler extends ChannelInboundHandlerAdapter {
 
-    private ClientCacheContext mCacheContext;
 
-    public CacheServerChannelHandler(ClientCacheContext cacheContext) {
-      mCacheContext = cacheContext;
+    public CacheServerChannelHandler() {
     }
 
     @Override
@@ -156,31 +159,40 @@ public class CacheServer {
       throw new RuntimeException(cause);
     }
 
-    private void handleRemoteReadRequest(ChannelHandlerContext ctx, RemoteReadRequest readRequest)
-      throws IOException, AlluxioException {
-
+    private void handleRemoteReadRequest(ChannelHandlerContext ctx, RemoteReadRequest readRequest) {
       long fileId = readRequest.getFileId();
       long begin = readRequest.getBegin();
       long end = readRequest.getEnd();
-      //FileInStream in = fs.openFile(mCacheContext.getMetedataCache().getUri(fileId));
-      OnlyReadLockTask lockTask = new OnlyReadLockTask(mCacheContext.getLockManager());
-
-      lockTask.setFileId(fileId);
-      try {
-        long fileLength = mCacheContext.getMetedataCache().getFileLength(fileId);
-        CacheUnit unit = mCacheContext.getCache(fileId, fileLength, begin, end, lockTask);
-
-       // if (!unit.isFinish()) {
-         // ((TempCacheUnit) unit).setInStream(in);
-       // }
-
-        RemoteReadResponse response = new RemoteReadResponse(readRequest.getMessageId(),
-          unit.get(begin, end - begin), (int)(end - begin));
-        ctx.writeAndFlush(response);
+      if (begin == 0) {
+        easySentData(fileId, ctx, readRequest.getMessageId());
+      } else {
+        //todo
       }
-      finally {
-        lockTask.unlockAllReadLocks();
+    }
+
+
+    // Send a whole file to client continuously.
+    private void easySentData(long fileId, ChannelHandlerContext ctx, long messageId) {
+      FileCacheEntity entity = mCacheContext.getCache(fileId);
+      int currIndex;
+      int currLen = 0;
+      int before = 0;
+      int pos =0;
+      while(before < entity.mData.size() ) {
+        for (currIndex = before ;currLen < SentLimit && currIndex < entity.mData.size();
+             currIndex ++) {
+          currLen += entity.mData.get(currIndex).capacity();
+        }
+        RemoteReadResponse response = new RemoteReadResponse(messageId,
+                entity.mData.subList(before, currIndex), currLen, pos);
+        ctx.channel().writeAndFlush(response);
+        pos += currLen;
+        currLen = 0;
+        before = currIndex;
       }
+
+      RemoteReadFinishResponse response = new RemoteReadFinishResponse(true, messageId);
+      ctx.channel().writeAndFlush(response);
     }
   }
 
