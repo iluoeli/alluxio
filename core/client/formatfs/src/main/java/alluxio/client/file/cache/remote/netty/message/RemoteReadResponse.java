@@ -64,4 +64,12 @@ public class RemoteReadResponse extends RPCMessage implements PayloadMessage {
     in.retain();
     return  in.slice(0, length);
   }
+
+  public String toString() {
+    long actualLength = 0;
+    for (ByteBuf buf : mData) {
+      actualLength += buf.capacity();
+    }
+    return "pos : " + mPos + " length : " + mLength + " actual length : " + actualLength;
+  }
 }

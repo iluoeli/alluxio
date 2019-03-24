@@ -59,4 +59,8 @@ public class RemoteReadRequest extends RPCMessage {
   public Type getType() {
     return Type.REMOTE_READ_REQUEST;
   }
+
+  public String toString() {
+    return "fileId : " + mFileId + " length : " + (mEnd - mBegin);
+  }
 }

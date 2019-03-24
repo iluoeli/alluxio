@@ -25,6 +25,7 @@ import io.netty.buffer.ByteBufAllocator;
 import io.netty.channel.*;
 import io.netty.channel.epoll.EpollEventLoopGroup;
 import io.netty.channel.epoll.EpollServerDomainSocketChannel;
+import io.netty.channel.epoll.EpollServerSocketChannel;
 import io.netty.channel.nio.NioEventLoop;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.SocketChannel;
@@ -35,6 +36,7 @@ import io.netty.channel.unix.DomainSocketChannel;
 
 import java.io.IOException;
 import java.net.InetAddress;
+import java.net.InetSocketAddress;
 import java.net.SocketAddress;
 import java.util.ArrayList;
 import java.util.LinkedList;
@@ -46,7 +48,7 @@ public class CacheServer {
   private int mPort;
   private FileCacheContext mCacheContext;
   private ChannelHandler mChannelHandler;
-  private int SentLimit;
+  private int SentLimit = 8 *1024 * 1024;
 
   public CacheServer(String hostName, int port, FileCacheContext cacheContext) {
     mHostname = hostName;
@@ -62,10 +64,12 @@ public class CacheServer {
     ServerBootstrap bootstrap = createBootstrap(bossGroup, workerGroup, mChannelHandler);
     ChannelFuture future = bootstrap.bind(getSocketAddress()).sync();
     mCacheContext.getThreadPool().submit(new CloseFutureSync(future, bossGroup, workerGroup));
+    System.out.println(future.channel().config().toString());
   }
 
   private SocketAddress getSocketAddress() {
-    return new DomainSocketAddress("/tmp/domain");
+    return new InetSocketAddress("127.0.0.1", 26666);
+    //return new DomainSocketAddress("/tmp/domain");
   }
 
   public int getWorkerThreadNum() {
@@ -73,12 +77,15 @@ public class CacheServer {
   }
 
   EventLoopGroup createEventLoopGroup(int numThreads, String threadPrefix) {
-   // ThreadFactory threadFactory = ThreadFactoryUtils.build(threadPrefix, true);
-    return new EpollEventLoopGroup(numThreads);
+    ThreadFactory threadFactory = ThreadFactoryUtils.build(threadPrefix, false);
+    //return new EpollEventLoopGroup(numThreads);
+    return new NioEventLoopGroup(numThreads, threadFactory);
   }
 
   private Class<? extends ServerChannel> getServerSocketChannel() {
-    return EpollServerDomainSocketChannel.class;
+   // return EpollServerDomainSocketChannel.class;
+    //return EpollServerSocketChannel.class;
+    return NioServerSocketChannel.class;
   }
 
   private ServerBootstrap createBootstrap(EventLoopGroup bossGroup, EventLoopGroup workerGroup,
@@ -185,6 +192,7 @@ public class CacheServer {
         }
         RemoteReadResponse response = new RemoteReadResponse(messageId,
                 entity.mData.subList(before, currIndex), currLen, pos);
+        System.out.println("======== server send ======== " + response.toString());
         ctx.channel().writeAndFlush(response);
         pos += currLen;
         currLen = 0;

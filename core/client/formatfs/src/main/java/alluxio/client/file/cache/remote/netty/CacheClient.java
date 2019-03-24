@@ -1,8 +1,10 @@
 package alluxio.client.file.cache.remote.netty;
 
+import alluxio.client.file.cache.remote.FileCacheContext;
 import alluxio.client.file.cache.remote.netty.message.RPCMessage;
 import alluxio.client.file.cache.remote.netty.message.RemoteReadRequest;
 import alluxio.client.file.cache.remote.netty.message.RemoteReadResponse;
+import alluxio.client.file.cache.remote.stream.RemoteFileInputStream;
 import alluxio.client.file.cache.test.CacheClientServerTest;
 import alluxio.util.ThreadFactoryUtils;
 import io.netty.bootstrap.Bootstrap;
@@ -10,12 +12,19 @@ import io.netty.buffer.ByteBuf;
 import io.netty.channel.*;
 import io.netty.channel.epoll.EpollDomainSocketChannel;
 import io.netty.channel.epoll.EpollEventLoopGroup;
+import io.netty.channel.nio.NioEventLoopGroup;
+import io.netty.channel.socket.nio.NioSocketChannel;
 import io.netty.channel.unix.DomainSocketAddress;
 import io.netty.channel.unix.DomainSocketChannel;
+import org.apache.commons.lang3.RandomUtils;
 
+import java.io.IOException;
+import java.net.InetSocketAddress;
 import java.net.SocketAddress;
 import java.util.List;
 import java.util.Map;
+import java.util.Random;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
@@ -24,38 +33,32 @@ import java.util.concurrent.ThreadFactory;
 public final class CacheClient {
   public static final CacheClient INSTANCE = new CacheClient();
   private Channel mChannel = null;
-  private Map<Long, Response> mDataMap = new ConcurrentHashMap<>();
   private final String mServerHostName = "localhost";
   private final int mServerPort = 8080;
-  //private boolean supportDomainSocket = true;
 
-  private CacheClient() {
+  public CacheClient() {
 
   }
 
-  public void addData(long messageID, List<ByteBuf> data) {
-    mDataMap.get(messageID).addData(data);
-  }
+  public void testRead() throws IOException {
+    long fileId = 1;
+    long msgId = Math.abs(new Random(System.currentTimeMillis()).nextLong());
 
-  public List<ByteBuf> read(long fileId, long begin, long end) {
-    Response response = new Response();
-    RemoteReadRequest readRequest = new RemoteReadRequest(fileId, begin, end);
-    long messageId = readRequest.getMessageId();
+    RemoteFileInputStream in = new RemoteFileInputStream(fileId, msgId);
+    RemoteReadRequest readRequest = new RemoteReadRequest(fileId, 0, 10 * 1024 * 1024, msgId);
+    FileCacheContext.INSTANCE.initProducer(msgId, in);
+    Channel channel = getChannel();
+    channel.writeAndFlush(readRequest);
+    System.out.println("=============client send=======" + readRequest.toString());
 
-    mDataMap.put(messageId, response);
-    mChannel = getChannel();
-    mChannel.writeAndFlush(readRequest);
-    return response.get();
-  }
-
-  public int read0(List<ByteBuf> src, byte[] b, int off, int len) {
-    int pos = off;
-    for (ByteBuf tmp : src) {
-      tmp.readBytes(b, pos, tmp.capacity());
-      pos += tmp.capacity();
+    byte[] tmp = new byte[1024 * 1024];
+    int read = 0;
+    while ((read = in.read(tmp, 0, 1024 * 1024) )!= -1) {
+      System.out.println("read : " + read);
     }
-    return len;
+
   }
+
 
   public Channel getChannel() {
     if (mChannel == null || !mChannel.isActive()) {
@@ -65,29 +68,34 @@ public final class CacheClient {
   }
 
   EventLoopGroup createEventLoopGroup(int numThreads, String threadPrefix) {
-    ThreadFactory threadFactory = ThreadFactoryUtils.build(threadPrefix, true);
-    return new EpollEventLoopGroup(numThreads, threadFactory);
+    ThreadFactory threadFactory = ThreadFactoryUtils.build(threadPrefix, false);
+    // new EpollEventLoopGroup(numThreads, threadFactory);
+    return new NioEventLoopGroup(numThreads, threadFactory);
+
   }
 
   private SocketAddress getServerAddress() {
-    return new DomainSocketAddress("/tmp/domain");
+    return new InetSocketAddress("127.0.0.1", 26666);
+    // return new DomainSocketAddress("/tmp/domain");
   }
 
   private void connect(SocketAddress address) {
-    EventLoopGroup workerGroup = createEventLoopGroup(1, "client-netty-thread-%d");
+
+    EventLoopGroup workerGroup = createEventLoopGroup(4, "client-netty-thread-%d");
     Bootstrap bootstrap = createBootstrap(workerGroup, new CacheClientChannelHandler());
     ChannelFuture future = bootstrap.connect(address);
     try {
       future.get();
     } catch (InterruptedException | ExecutionException e) {
-      e.printStackTrace();
       workerGroup.shutdownGracefully();
+      throw new RuntimeException(e);
     }
     mChannel = future.channel();
   }
 
   private Class<? extends Channel> getSockChannel() {
-    return EpollDomainSocketChannel.class;
+    //return EpollDomainSocketChannel.class;
+    return NioSocketChannel.class;
   }
 
   private Bootstrap createBootstrap(EventLoopGroup workerGroup, final
@@ -110,17 +118,15 @@ public final class CacheClient {
   }
 
   class CacheClientChannelHandler extends SimpleChannelInboundHandler<RPCMessage> {
-
+    FileCacheContext mContext = FileCacheContext.INSTANCE;
     @Override
     protected void channelRead0(ChannelHandlerContext channelHandlerContext, RPCMessage rpcMessage) throws Exception {
 
       switch (rpcMessage.getType()) {
         case REMOTE_READ_RESPONSE:
-          List<ByteBuf> data =((RemoteReadResponse) rpcMessage).getPayload();
-          CacheClient.INSTANCE.addData(((RemoteReadResponse) rpcMessage).getMessageId()
-            , data);
+          mContext.produceData(rpcMessage.getMessageId(), (RemoteReadResponse)rpcMessage);
         case REMOTE_READ_FINISH_RESPONSE:
-
+          mContext.finishProduce(rpcMessage.getMessageId());
           break;
         default:
           throw new IllegalArgumentException("Illegal received message type " + rpcMessage.getType());
@@ -134,26 +140,4 @@ public final class CacheClient {
     }
   }
 
-  class Response {
-    List<ByteBuf> mData;
-    CountDownLatch mWait;
-
-    public Response() {
-      mWait = new CountDownLatch(1);
-    }
-
-    public void addData(List<ByteBuf> data) {
-      mData = data;
-      mWait.countDown();
-    }
-
-    public List<ByteBuf> get() {
-      try {
-        mWait.await();
-      } catch (InterruptedException e) {
-        throw new RuntimeException(e);
-      }
-      return mData;
-    }
-  }
 }

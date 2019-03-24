@@ -12,14 +12,14 @@ public class CacheFileInputStream extends InputStream {
   private FileCacheContext mCacheContext;
   private FileCacheEntity mData;
   private int mCurrIndex;
-  private int mPos;
-  private int mCurrBytebufReadedLength;
+  protected int mPos;
+  protected int mCurrBytebufReadedLength;
+  protected int mFileLength;
 
   public CacheFileInputStream(long fileId) {
     mCacheContext = FileCacheContext.INSTANCE;
     mData = mCacheContext.getCache(fileId);
-    Preconditions.checkArgument(mData != null);
-
+    resetIndex();
   }
 
   public void resetIndex() {
@@ -42,7 +42,6 @@ public class CacheFileInputStream extends InputStream {
   }
 
   public int read(byte[] b, int off, int len) throws IOException {
-    Preconditions.checkArgument(mData.mData.size() > 0);
     Preconditions.checkArgument(off + len <= b.length);
 
     int leftToRead = (int) Math.min(mData.getSize() - mPos, len);
@@ -92,6 +91,10 @@ public class CacheFileInputStream extends InputStream {
 
   public void close() throws IOException {
 
+  }
+
+  public int remaining() {
+    return mFileLength - mPos;
   }
 
 }

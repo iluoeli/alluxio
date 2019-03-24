@@ -13,12 +13,12 @@ public class FileCacheEntity extends CacheInternalUnit {
 
 
   public FileCacheEntity(long  fileId, long fileLength) {
-    super(0, fileLength -1, fileId);
+    super(0, fileLength , fileId);
     mFileLength = fileLength;
   }
 
   public FileCacheEntity(long fileId, long fileLength, List<ByteBuf> data) {
-    super(0, fileLength - 1, fileId, data);
+    super(0, fileLength, fileId, data);
     mFileLength = fileLength;
 
   }
