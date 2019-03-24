@@ -2,8 +2,6 @@ package alluxio.client.file.cache.remote.netty;
 
 import alluxio.client.file.cache.remote.netty.message.PayloadMessage;
 import alluxio.client.file.cache.remote.netty.message.RPCMessage;
-import alluxio.client.file.cache.remote.netty.message.RemoteReadRequest;
-import alluxio.client.file.cache.test.CacheClientServerTest;
 import com.google.common.primitives.Ints;
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.ChannelHandlerContext;
@@ -51,5 +49,6 @@ public class ServerClientMessageEncoder extends MessageToMessageEncoder<RPCMessa
     if (hasPayload) {
       out.addAll(payload);
     }
+    System.out.println("encoded : " + msg.toString());
   }
 }

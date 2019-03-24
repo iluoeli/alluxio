@@ -46,6 +46,7 @@ public enum FileCacheContext {
   }
 
   public void finishProduce(long msgId) {
+    mDataProducer.get(msgId).isFinishSending.getAndSet(true);
     mDataProducer.remove(msgId);
   }
 

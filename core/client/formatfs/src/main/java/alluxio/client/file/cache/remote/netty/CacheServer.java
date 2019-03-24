@@ -1,45 +1,25 @@
 package alluxio.client.file.cache.remote.netty;
 
-import alluxio.client.file.CacheFileSystem;
-import alluxio.client.file.FileInStream;
-import alluxio.client.file.FileSystem;
-import alluxio.client.file.cache.CacheUnit;
-import alluxio.client.file.cache.ClientCacheContext;
-import alluxio.client.file.cache.OnlyReadLockTask;
-import alluxio.client.file.cache.TempCacheUnit;
 import alluxio.client.file.cache.remote.FileCacheContext;
 import alluxio.client.file.cache.remote.FileCacheEntity;
 import alluxio.client.file.cache.remote.netty.message.RPCMessage;
 import alluxio.client.file.cache.remote.netty.message.RemoteReadFinishResponse;
 import alluxio.client.file.cache.remote.netty.message.RemoteReadRequest;
 import alluxio.client.file.cache.remote.netty.message.RemoteReadResponse;
-import alluxio.client.file.cache.test.CacheClientServerTest;
-import alluxio.exception.AlluxioException;
 import alluxio.util.ThreadFactoryUtils;
-import alluxio.util.network.NettyUtils;
-import alluxio.wire.WorkerNetAddress;
 import com.google.common.base.Preconditions;
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
 import io.netty.channel.*;
-import io.netty.channel.epoll.EpollEventLoopGroup;
-import io.netty.channel.epoll.EpollServerDomainSocketChannel;
-import io.netty.channel.epoll.EpollServerSocketChannel;
-import io.netty.channel.nio.NioEventLoop;
 import io.netty.channel.nio.NioEventLoopGroup;
-import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
 import io.netty.channel.socket.nio.NioSocketChannel;
 import io.netty.channel.unix.DomainSocketAddress;
 import io.netty.channel.unix.DomainSocketChannel;
 
-import java.io.IOException;
-import java.net.InetAddress;
-import java.net.InetSocketAddress;
 import java.net.SocketAddress;
 import java.util.ArrayList;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.concurrent.ThreadFactory;
 
@@ -48,7 +28,7 @@ public class CacheServer {
   private int mPort;
   private FileCacheContext mCacheContext;
   private ChannelHandler mChannelHandler;
-  private int SentLimit = 8 *1024 * 1024;
+  private int SentLimit = 8 * 1024 * 1024;
 
   public CacheServer(String hostName, int port, FileCacheContext cacheContext) {
     mHostname = hostName;
@@ -59,17 +39,15 @@ public class CacheServer {
 
   public void launch() throws Exception {
     EventLoopGroup bossGroup = createEventLoopGroup(4, "Server-netty-boss-thread-%d");
-    EventLoopGroup workerGroup = createEventLoopGroup(getWorkerThreadNum(),
-      "Server-netty-worket-thread-%d");
+    EventLoopGroup workerGroup = createEventLoopGroup(getWorkerThreadNum(), "Server-netty-worket-thread-%d");
     ServerBootstrap bootstrap = createBootstrap(bossGroup, workerGroup, mChannelHandler);
-    ChannelFuture future = bootstrap.bind(getSocketAddress()).sync();
+    ChannelFuture future = bootstrap.bind(26666).sync();
     mCacheContext.getThreadPool().submit(new CloseFutureSync(future, bossGroup, workerGroup));
     System.out.println(future.channel().config().toString());
   }
 
   private SocketAddress getSocketAddress() {
-    return new InetSocketAddress("127.0.0.1", 26666);
-    //return new DomainSocketAddress("/tmp/domain");
+    return new DomainSocketAddress("/tmp/domain");
   }
 
   public int getWorkerThreadNum() {
@@ -83,25 +61,23 @@ public class CacheServer {
   }
 
   private Class<? extends ServerChannel> getServerSocketChannel() {
-   // return EpollServerDomainSocketChannel.class;
+    // return EpollServerDomainSocketChannel.class;
     //return EpollServerSocketChannel.class;
     return NioServerSocketChannel.class;
   }
 
-  private ServerBootstrap createBootstrap(EventLoopGroup bossGroup, EventLoopGroup workerGroup,
-                                    ChannelHandler channelHandler) {
+  private ServerBootstrap createBootstrap(EventLoopGroup bossGroup, EventLoopGroup workerGroup, ChannelHandler channelHandler) {
     ServerBootstrap bootstrap = new ServerBootstrap();
-    bootstrap.group(bossGroup, workerGroup).channel(getServerSocketChannel())
-      .childHandler(new ChannelInitializer<DomainSocketChannel>() {
-        @Override
-        public void initChannel(DomainSocketChannel ch) throws Exception {
-          ChannelPipeline pipeline = ch.pipeline();
-          pipeline.addLast("Frame decoder", RPCMessage.createFrameDecoder());
-          pipeline.addLast("Message decoder",new ServerClientMessageDecoder());
-          pipeline.addLast("Message encoder", new ServerClientMessageEncoder());
-          pipeline.addLast("Channel handler", channelHandler);
-        }
-      }).childOption(ChannelOption.SO_KEEPALIVE, true);
+    bootstrap.group(bossGroup, workerGroup).channel(getServerSocketChannel()).childHandler(new ChannelInitializer<Channel>() {
+      @Override
+      public void initChannel(Channel ch) throws Exception {
+        ChannelPipeline pipeline = ch.pipeline();
+        pipeline.addLast("Frame decoder", RPCMessage.createFrameDecoder());
+        pipeline.addLast("Message decoder", new ServerClientMessageDecoder());
+        pipeline.addLast("Message encoder", new ServerClientMessageEncoder());
+        pipeline.addLast("Channel handler", channelHandler);
+      }
+    }).childOption(ChannelOption.SO_KEEPALIVE, true);
     return bootstrap;
   }
 
@@ -117,11 +93,10 @@ public class CacheServer {
      * Constructor for {@link CloseFutureSync}.
      *
      * @param channelFuture the channel future
-     * @param bossGroup the netty boss group
-     * @param workerGroup the netty worker group
+     * @param bossGroup     the netty boss group
+     * @param workerGroup   the netty worker group
      */
-    public CloseFutureSync(ChannelFuture channelFuture, EventLoopGroup bossGroup,
-                           EventLoopGroup workerGroup) {
+    public CloseFutureSync(ChannelFuture channelFuture, EventLoopGroup bossGroup, EventLoopGroup workerGroup) {
       mChannelFuture = channelFuture;
       mBossGroup = bossGroup;
       mWorkerGroup = workerGroup;
@@ -149,11 +124,11 @@ public class CacheServer {
     @Override
     public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
       Preconditions.checkArgument(msg instanceof RPCMessage, "The message must be RPCMessage");
-      RPCMessage res = (RPCMessage)msg;
+      RPCMessage res = (RPCMessage) msg;
       RPCMessage.Type tp = res.getType();
       switch (tp) {
         case REMOTE_READ_REQUEST:
-          handleRemoteReadRequest(ctx, (RemoteReadRequest)res);
+          handleRemoteReadRequest(ctx, (RemoteReadRequest) res);
           break;
         default:
           throw new IllegalArgumentException(String.format("The request type %s is illegal", tp));
@@ -170,6 +145,7 @@ public class CacheServer {
       long fileId = readRequest.getFileId();
       long begin = readRequest.getBegin();
       long end = readRequest.getEnd();
+      System.out.println("server receive :" + readRequest.toString());
       if (begin == 0) {
         easySentData(fileId, ctx, readRequest.getMessageId());
       } else {
@@ -184,14 +160,12 @@ public class CacheServer {
       int currIndex;
       int currLen = 0;
       int before = 0;
-      int pos =0;
-      while(before < entity.mData.size() ) {
-        for (currIndex = before ;currLen < SentLimit && currIndex < entity.mData.size();
-             currIndex ++) {
+      int pos = 0;
+      while (before < entity.mData.size()) {
+        for (currIndex = before; currLen < SentLimit && currIndex < entity.mData.size(); currIndex++) {
           currLen += entity.mData.get(currIndex).capacity();
         }
-        RemoteReadResponse response = new RemoteReadResponse(messageId,
-                entity.mData.subList(before, currIndex), currLen, pos);
+        RemoteReadResponse response = new RemoteReadResponse(messageId, entity.mData.subList(before, currIndex), currLen, pos);
         System.out.println("======== server send ======== " + response.toString());
         ctx.channel().writeAndFlush(response);
         pos += currLen;
@@ -202,33 +176,27 @@ public class CacheServer {
       RemoteReadFinishResponse response = new RemoteReadFinishResponse(true, messageId);
       ctx.channel().writeAndFlush(response);
     }
+
   }
 
 
+  public static void addCache() {
+    long fileId = 1;
+    List<ByteBuf> tmp = new ArrayList<>();
+    while (tmp.size() < 5) {
+      tmp.add(ByteBufAllocator.DEFAULT.buffer(1024 * 1024 * 2));
+    }
+    FileCacheEntity entity = new FileCacheEntity(0, 10 * 1024 * 1024, tmp);
+    FileCacheContext.INSTANCE.addCache(fileId, entity);
+  }
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+  public static void main(String[] arg) throws Exception {
+    addCache();
+    System.out.println("add finish");
+    CacheServer server = new CacheServer("localhost", 8080, FileCacheContext.INSTANCE);
+    server.launch();
+    //System.out.println("start server");
+    System.out.println("===============finish===============");
+  }
 }

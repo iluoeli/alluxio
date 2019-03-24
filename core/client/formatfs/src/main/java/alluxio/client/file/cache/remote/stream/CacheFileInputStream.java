@@ -41,10 +41,14 @@ public class CacheFileInputStream extends InputStream {
     return mData.mData.get(mCurrIndex);
   }
 
+  public int leftToRead(int needRead) {
+    return  Math.min(mFileLength - mPos, needRead);
+  }
+
   public int read(byte[] b, int off, int len) throws IOException {
     Preconditions.checkArgument(off + len <= b.length);
 
-    int leftToRead = (int) Math.min(mData.getSize() - mPos, len);
+    int leftToRead = leftToRead(len);
     int readedLen = 0;
     ByteBuf current = current();
     int currentBytebyfCanReadLen = current.capacity() - mCurrBytebufReadedLength;

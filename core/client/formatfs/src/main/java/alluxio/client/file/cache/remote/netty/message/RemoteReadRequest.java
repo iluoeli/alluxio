@@ -10,11 +10,6 @@ public class RemoteReadRequest extends RPCMessage {
   private long mBegin;
   private long mEnd;
 
-  public RemoteReadRequest(long fileId, long begin, long end) {
-    mFileId = fileId;
-    mBegin = begin;
-    mEnd = end;
-  }
 
   public RemoteReadRequest(long fileId, long begin, long end, long messageId) {
     super(messageId);

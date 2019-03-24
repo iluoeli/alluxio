@@ -5,29 +5,19 @@ import alluxio.client.file.cache.remote.netty.message.RPCMessage;
 import alluxio.client.file.cache.remote.netty.message.RemoteReadRequest;
 import alluxio.client.file.cache.remote.netty.message.RemoteReadResponse;
 import alluxio.client.file.cache.remote.stream.RemoteFileInputStream;
-import alluxio.client.file.cache.test.CacheClientServerTest;
 import alluxio.util.ThreadFactoryUtils;
+import com.google.common.base.Preconditions;
 import io.netty.bootstrap.Bootstrap;
-import io.netty.buffer.ByteBuf;
 import io.netty.channel.*;
-import io.netty.channel.epoll.EpollDomainSocketChannel;
-import io.netty.channel.epoll.EpollEventLoopGroup;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.nio.NioSocketChannel;
-import io.netty.channel.unix.DomainSocketAddress;
 import io.netty.channel.unix.DomainSocketChannel;
-import org.apache.commons.lang3.RandomUtils;
 
 import java.io.IOException;
+import java.net.InetAddress;
 import java.net.InetSocketAddress;
-import java.net.SocketAddress;
-import java.util.List;
-import java.util.Map;
+import java.net.UnknownHostException;
 import java.util.Random;
-import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ThreadFactory;
 
 public final class CacheClient {
@@ -54,7 +44,7 @@ public final class CacheClient {
     byte[] tmp = new byte[1024 * 1024];
     int read = 0;
     while ((read = in.read(tmp, 0, 1024 * 1024) )!= -1) {
-      System.out.println("read : " + read);
+    System.out.println("read : " + read);
     }
 
   }
@@ -62,7 +52,7 @@ public final class CacheClient {
 
   public Channel getChannel() {
     if (mChannel == null || !mChannel.isActive()) {
-      connect(getServerAddress());
+      connect(getServerAddress(), 26666);
     }
     return mChannel;
   }
@@ -74,23 +64,27 @@ public final class CacheClient {
 
   }
 
-  private SocketAddress getServerAddress() {
-    return new InetSocketAddress("127.0.0.1", 26666);
-    // return new DomainSocketAddress("/tmp/domain");
+  private InetAddress getServerAddress() {
+    InetAddress address;
+    try {
+      address = InetAddress.getLocalHost();
+    } catch (UnknownHostException e) {
+      throw new RuntimeException(e);
+    }    // return new DomainSocketAddress("/tmp/domain");
+    return address;
   }
 
-  private void connect(SocketAddress address) {
-
+  private void connect(InetAddress address, int port) {
     EventLoopGroup workerGroup = createEventLoopGroup(4, "client-netty-thread-%d");
     Bootstrap bootstrap = createBootstrap(workerGroup, new CacheClientChannelHandler());
-    ChannelFuture future = bootstrap.connect(address);
     try {
+      ChannelFuture future = bootstrap.connect(InetAddress.getLocalHost(), 26666);
       future.get();
-    } catch (InterruptedException | ExecutionException e) {
+      mChannel = future.channel();
+    } catch (Exception e) {
       workerGroup.shutdownGracefully();
       throw new RuntimeException(e);
     }
-    mChannel = future.channel();
   }
 
   private Class<? extends Channel> getSockChannel() {
@@ -104,24 +98,26 @@ public final class CacheClient {
     bootstrap.group(workerGroup);
     bootstrap.channel(getSockChannel());
     bootstrap.option(ChannelOption.SO_KEEPALIVE, true);
-    bootstrap.handler(new ChannelInitializer<DomainSocketChannel>() {
+    bootstrap.handler(new ChannelInitializer<Channel>() {
       @Override
-      public void initChannel(DomainSocketChannel ch) throws Exception {
+      public void initChannel(Channel ch) throws Exception {
         ChannelPipeline pipeline = ch.pipeline();
         pipeline.addLast("Frame decoder", RPCMessage.createFrameDecoder());
-        pipeline.addLast("Message decoder", new ServerClientMessageDecoder());
         pipeline.addLast("Message encoder", new ServerClientMessageEncoder());
+        pipeline.addLast("Message decoder", new ServerClientMessageDecoder());
         pipeline.addLast("Message handler", handler);
       }
     });
     return bootstrap;
   }
 
-  class CacheClientChannelHandler extends SimpleChannelInboundHandler<RPCMessage> {
+  class CacheClientChannelHandler extends ChannelInboundHandlerAdapter {
     FileCacheContext mContext = FileCacheContext.INSTANCE;
-    @Override
-    protected void channelRead0(ChannelHandlerContext channelHandlerContext, RPCMessage rpcMessage) throws Exception {
 
+    @Override
+    public  void channelRead(ChannelHandlerContext channelHandlerContext, Object msg) throws Exception {
+      Preconditions.checkArgument(msg instanceof RPCMessage, "The message must be RPCMessage");
+      RPCMessage rpcMessage = (RPCMessage) msg;
       switch (rpcMessage.getType()) {
         case REMOTE_READ_RESPONSE:
           mContext.produceData(rpcMessage.getMessageId(), (RemoteReadResponse)rpcMessage);
@@ -139,5 +135,9 @@ public final class CacheClient {
       throw new RuntimeException(cause);
     }
   }
-
+  public static void main(String[] arg) throws Exception{
+    CacheClient cacheClient = new CacheClient();
+    cacheClient.testRead();
+    System.out.println("===============finish===============");
+  }
 }
