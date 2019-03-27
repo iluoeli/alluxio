@@ -27,18 +27,18 @@ public class CacheFileInputStream extends InputStream {
     mCurrBytebufReadedLength = 0;
   }
 
-  ByteBuf forward() {
+  ByteBuf forward() throws IOException {
     mCurrIndex ++;
     mCurrBytebufReadedLength = 0;
     if (mCurrIndex < mData.mData.size()) {
-      return mData.mData.get(mCurrIndex);
+      return mData.getBuffer(mCurrIndex);
     } else {
       return null;
     }
   }
 
-  ByteBuf current() {
-    return mData.mData.get(mCurrIndex);
+  ByteBuf current() throws IOException {
+    return mData.getBuffer(mCurrIndex);
   }
 
   public int leftToRead(int needRead) {
@@ -104,5 +104,4 @@ public class CacheFileInputStream extends InputStream {
   public int remaining() {
     return (int)mFileLength - mPos;
   }
-
 }

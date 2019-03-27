@@ -167,6 +167,7 @@ public class MTLRUEvictor extends LRUEvictor {
         for (long userId1 : actualEvictContext.keySet()) {
           System.out.println(userId1 + " : " + actualEvictContext.get(userId1).computePartialHitRatio());
         }
+        System.out.println("global : " + (double) mHitSize / (double) mAccessSize);
       }
 
       if (j == 400) {

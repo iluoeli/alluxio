@@ -92,7 +92,7 @@ public class RemoteFileInputStream extends CacheFileInputStream  {
 
 
   @Override
-  ByteBuf forward() {
+  ByteBuf forward() throws IOException {
     if (mCurrentResponse == null || mCurrResponseIndex == -1 ||
         (mCurrResponseIndex == mCurrentResponse.getPayload().size() - 1
         && mCurrBytebufReadedLength == mCurrentBuf.capacity())) {
@@ -102,7 +102,7 @@ public class RemoteFileInputStream extends CacheFileInputStream  {
       mCurrBytebufReadedLength = 0;
       mCurrResponseIndex ++;
     } else {
-      throw new RuntimeException("current bytebuf has not finished reading");
+      throw new IOException("current bytebuf has not finished reading");
     }
     if (mCurrResponseIndex == -1) {
       mCurrentBuf = null;
@@ -114,7 +114,7 @@ public class RemoteFileInputStream extends CacheFileInputStream  {
   }
 
   @Override
-  ByteBuf current() {
+  ByteBuf current()  throws IOException {
     if (mCurrentBuf == null) {
       return forward();
     }
