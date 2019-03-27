@@ -31,8 +31,6 @@ public class RemoteFileInputStream extends CacheFileInputStream  {
   private RemoteReadResponse mCurrentResponse = null;
   private ByteBuf mCurrentBuf;
   private ReentrantLock mCheckQueueLock = new ReentrantLock();
-  private int mResourceLength;
-  public AtomicBoolean isFinishSending = new AtomicBoolean(false);
 
   public RemoteFileInputStream(long fileId, long msgId) {
       super(fileId);
@@ -40,6 +38,10 @@ public class RemoteFileInputStream extends CacheFileInputStream  {
     mCurrResponseIndex = -1;
     mPos = 0;
     messageId = msgId;
+  }
+
+  public void setFileLength(long fileLength) {
+    mFileLength = fileLength;
   }
 
   public long getMessageId() {
@@ -50,9 +52,6 @@ public class RemoteFileInputStream extends CacheFileInputStream  {
     mCheckQueueLock.lock();
     try {
       mReceiveData.offer(remoteReadResponse);
-      for (ByteBuf b : remoteReadResponse.getPayload()) {
-        mResourceLength += b.capacity();
-      }
     } finally {
       mCheckQueueLock.unlock();
     }
@@ -71,20 +70,23 @@ public class RemoteFileInputStream extends CacheFileInputStream  {
 
     try {
       mCheckQueueLock.lock();
-      while (!isFinishSending.get()&&
+      while (mPos != mFileLength &&
         (mReceiveData.isEmpty() || mReceiveData.peek().getPos() != mPos)) {
         mCheckQueueLock.unlock();
         Thread.sleep(1);
         mCheckQueueLock.lock();
       }
-      if (mReceiveData.isEmpty()) {
+      if (mPos == mFileLength ) {
         mCurrResponseIndex = -1;
+        mCurrentResponse = null;
+      } else {
+        mCurrentResponse = mReceiveData.peek();
+        mCurrResponseIndex = 0;
       }
     } catch (Exception e) {
       throw new RuntimeException(e);
     } finally {
       mCheckQueueLock.unlock();
-      mCurrResponseIndex = 0;
     }
   }
 
@@ -96,7 +98,6 @@ public class RemoteFileInputStream extends CacheFileInputStream  {
         && mCurrBytebufReadedLength == mCurrentBuf.capacity())) {
       updateCurrentResponse();
       mCurrBytebufReadedLength = 0;
-      mCurrResponseIndex = 0;
     } else if (mCurrBytebufReadedLength == mCurrentBuf.capacity()){
       mCurrBytebufReadedLength = 0;
       mCurrResponseIndex ++;
@@ -104,8 +105,10 @@ public class RemoteFileInputStream extends CacheFileInputStream  {
       throw new RuntimeException("current bytebuf has not finished reading");
     }
     if (mCurrResponseIndex == -1) {
+      mCurrentBuf = null;
       return null;
     }
+    System.out.println(mCurrentResponse);
     mCurrentBuf = mCurrentResponse.getPayload().get(mCurrResponseIndex);
     return mCurrentBuf;
   }
@@ -113,7 +116,7 @@ public class RemoteFileInputStream extends CacheFileInputStream  {
   @Override
   ByteBuf current() {
     if (mCurrentBuf == null) {
-      forward();
+      return forward();
     }
     return mCurrentBuf;
   }

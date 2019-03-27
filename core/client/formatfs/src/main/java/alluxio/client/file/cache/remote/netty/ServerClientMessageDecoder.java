@@ -18,7 +18,6 @@ public class ServerClientMessageDecoder extends MessageToMessageDecoder<ByteBuf>
 
   @Override
   public void decode(ChannelHandlerContext ctx, ByteBuf in, List<Object> out) throws Exception {
-    System.out.println("decode");
     out.add(RPCMessage.decodeMessage(in));
   }
 }

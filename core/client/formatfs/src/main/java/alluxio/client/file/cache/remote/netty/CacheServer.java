@@ -17,6 +17,7 @@ import io.netty.channel.socket.nio.NioServerSocketChannel;
 import io.netty.channel.socket.nio.NioSocketChannel;
 import io.netty.channel.unix.DomainSocketAddress;
 import io.netty.channel.unix.DomainSocketChannel;
+import org.apache.commons.lang3.RandomUtils;
 
 import java.net.SocketAddress;
 import java.util.ArrayList;
@@ -28,7 +29,7 @@ public class CacheServer {
   private int mPort;
   private FileCacheContext mCacheContext;
   private ChannelHandler mChannelHandler;
-  private int SentLimit = 8 * 1024 * 1024;
+  private int SentLimit = 4 * 1024 * 1024;
 
   public CacheServer(String hostName, int port, FileCacheContext cacheContext) {
     mHostname = hostName;
@@ -41,7 +42,7 @@ public class CacheServer {
     EventLoopGroup bossGroup = createEventLoopGroup(4, "Server-netty-boss-thread-%d");
     EventLoopGroup workerGroup = createEventLoopGroup(getWorkerThreadNum(), "Server-netty-worket-thread-%d");
     ServerBootstrap bootstrap = createBootstrap(bossGroup, workerGroup, mChannelHandler);
-    ChannelFuture future = bootstrap.bind(26666).sync();
+    ChannelFuture future = bootstrap.bind(26667).sync();
     mCacheContext.getThreadPool().submit(new CloseFutureSync(future, bossGroup, workerGroup));
     System.out.println(future.channel().config().toString());
   }
@@ -145,7 +146,6 @@ public class CacheServer {
       long fileId = readRequest.getFileId();
       long begin = readRequest.getBegin();
       long end = readRequest.getEnd();
-      System.out.println("server receive :" + readRequest.toString());
       if (begin == 0) {
         easySentData(fileId, ctx, readRequest.getMessageId());
       } else {
@@ -161,6 +161,7 @@ public class CacheServer {
       int currLen = 0;
       int before = 0;
       int pos = 0;
+
       while (before < entity.mData.size()) {
         for (currIndex = before; currLen < SentLimit && currIndex < entity.mData.size(); currIndex++) {
           currLen += entity.mData.get(currIndex).capacity();
@@ -172,8 +173,7 @@ public class CacheServer {
         currLen = 0;
         before = currIndex;
       }
-
-      RemoteReadFinishResponse response = new RemoteReadFinishResponse(true, messageId);
+      RemoteReadFinishResponse response = new RemoteReadFinishResponse( messageId, pos);
       ctx.channel().writeAndFlush(response);
     }
 
@@ -183,10 +183,17 @@ public class CacheServer {
   public static void addCache() {
     long fileId = 1;
     List<ByteBuf> tmp = new ArrayList<>();
-    while (tmp.size() < 5) {
-      tmp.add(ByteBufAllocator.DEFAULT.buffer(1024 * 1024 * 2));
+    long length = 0;
+    while (length < 20 * 1024 * 1024) {
+      long tmp1 = RandomUtils.nextLong( 1024 * 1024, 5 * 1024 * 1024);
+      ByteBuf buf = ByteBufAllocator.DEFAULT.buffer((int)tmp1);
+      for (int i = 0 ; i < buf.capacity(); i ++) {
+        buf.writeByte(i);
+      }
+      length += tmp1;
+      tmp.add(buf);
     }
-    FileCacheEntity entity = new FileCacheEntity(0, 10 * 1024 * 1024, tmp);
+    FileCacheEntity entity = new FileCacheEntity(0, 20 * 1024 * 1024, tmp);
     FileCacheContext.INSTANCE.addCache(fileId, entity);
   }
 

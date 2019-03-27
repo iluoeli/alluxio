@@ -2,6 +2,7 @@ package alluxio.client.file.cache.remote.netty;
 
 import alluxio.client.file.cache.remote.FileCacheContext;
 import alluxio.client.file.cache.remote.netty.message.RPCMessage;
+import alluxio.client.file.cache.remote.netty.message.RemoteReadFinishResponse;
 import alluxio.client.file.cache.remote.netty.message.RemoteReadRequest;
 import alluxio.client.file.cache.remote.netty.message.RemoteReadResponse;
 import alluxio.client.file.cache.remote.stream.RemoteFileInputStream;
@@ -43,16 +44,17 @@ public final class CacheClient {
 
     byte[] tmp = new byte[1024 * 1024];
     int read = 0;
+    long sum = 0;
     while ((read = in.read(tmp, 0, 1024 * 1024) )!= -1) {
-    System.out.println("read : " + read);
+      sum += read;
     }
-
+    Preconditions.checkArgument(sum == 20 * 1024 * 1024);
   }
 
 
   public Channel getChannel() {
     if (mChannel == null || !mChannel.isActive()) {
-      connect(getServerAddress(), 26666);
+      connect(getServerAddress(), 26667);
     }
     return mChannel;
   }
@@ -78,7 +80,7 @@ public final class CacheClient {
     EventLoopGroup workerGroup = createEventLoopGroup(4, "client-netty-thread-%d");
     Bootstrap bootstrap = createBootstrap(workerGroup, new CacheClientChannelHandler());
     try {
-      ChannelFuture future = bootstrap.connect(InetAddress.getLocalHost(), 26666);
+      ChannelFuture future = bootstrap.connect(InetAddress.getLocalHost(), 26667);
       future.get();
       mChannel = future.channel();
     } catch (Exception e) {
@@ -121,9 +123,10 @@ public final class CacheClient {
       switch (rpcMessage.getType()) {
         case REMOTE_READ_RESPONSE:
           mContext.produceData(rpcMessage.getMessageId(), (RemoteReadResponse)rpcMessage);
-        case REMOTE_READ_FINISH_RESPONSE:
-          mContext.finishProduce(rpcMessage.getMessageId());
           break;
+        case REMOTE_READ_FINISH_RESPONSE:
+          mContext.addLengthInfo(rpcMessage.getMessageId(), ((RemoteReadFinishResponse)rpcMessage).getFileLength());
+        break;
         default:
           throw new IllegalArgumentException("Illegal received message type " + rpcMessage.getType());
       }

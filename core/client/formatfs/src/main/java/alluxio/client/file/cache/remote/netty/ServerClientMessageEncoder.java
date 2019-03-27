@@ -4,6 +4,7 @@ import alluxio.client.file.cache.remote.netty.message.PayloadMessage;
 import alluxio.client.file.cache.remote.netty.message.RPCMessage;
 import com.google.common.primitives.Ints;
 import io.netty.buffer.ByteBuf;
+import io.netty.buffer.ByteBufAllocator;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.MessageToMessageEncoder;
 
@@ -44,11 +45,10 @@ public class ServerClientMessageEncoder extends MessageToMessageEncoder<RPCMessa
     buf.writeInt(frameLength);
     type.encode(buf);
     msg.encode(buf);
-
     out.add(buf);
     if (hasPayload) {
       out.addAll(payload);
     }
-    System.out.println("encoded : " + msg.toString());
   }
+
 }

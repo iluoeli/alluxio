@@ -23,6 +23,10 @@ public class RemoteReadResponse extends RPCMessage implements PayloadMessage {
     mLength = length;
   }
 
+  public int getDataLength() {
+    return mLength;
+  }
+
   @Override
   public Type getType() {
     return Type.REMOTE_READ_RESPONSE;
@@ -51,6 +55,7 @@ public class RemoteReadResponse extends RPCMessage implements PayloadMessage {
     ByteBuf data = decodeData(in, length);
     List<ByteBuf> l = new ArrayList<>();
     l.add(data);
+    System.out.println("RemoteReadResponse");
     return new RemoteReadResponse(messageId, l, length, pos);
   }
 

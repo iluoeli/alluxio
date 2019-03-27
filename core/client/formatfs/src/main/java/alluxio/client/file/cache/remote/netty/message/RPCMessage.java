@@ -85,6 +85,7 @@ public abstract class RPCMessage implements EncodedMessage {
    */
   public static RPCMessage decodeMessage(ByteBuf in) throws IOException {
     Type type = Type.decode(in);
+    System.out.println(type.toString());
     return decodeInternal(in, type);
   }
 
@@ -106,6 +107,8 @@ public abstract class RPCMessage implements EncodedMessage {
         return RemoteReadRequest.decode(in);
       case REMOTE_READ_RESPONSE:
         return RemoteReadResponse.decode(in);
+      case REMOTE_READ_FINISH_RESPONSE:
+        return RemoteReadFinishResponse.decode(in);
       default:
         throw new IllegalArgumentException("No corresponding RPC message for type " + type);
     }

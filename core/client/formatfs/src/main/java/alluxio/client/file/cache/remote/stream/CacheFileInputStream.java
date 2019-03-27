@@ -14,7 +14,7 @@ public class CacheFileInputStream extends InputStream {
   private int mCurrIndex;
   protected int mPos;
   protected int mCurrBytebufReadedLength;
-  protected int mFileLength;
+  protected volatile long mFileLength = -1;
 
   public CacheFileInputStream(long fileId) {
     mCacheContext = FileCacheContext.INSTANCE;
@@ -42,7 +42,7 @@ public class CacheFileInputStream extends InputStream {
   }
 
   public int leftToRead(int needRead) {
-    return  Math.min(mFileLength - mPos, needRead);
+    return  Math.min((int)mFileLength - mPos, needRead);
   }
 
   public int read(byte[] b, int off, int len) throws IOException {
@@ -51,6 +51,9 @@ public class CacheFileInputStream extends InputStream {
     int leftToRead = leftToRead(len);
     int readedLen = 0;
     ByteBuf current = current();
+    if (current == null) {
+      return -1;
+    }
     int currentBytebyfCanReadLen = current.capacity() - mCurrBytebufReadedLength;
 
     while (leftToRead > 0) {
@@ -58,10 +61,11 @@ public class CacheFileInputStream extends InputStream {
       current.getBytes(0, b, off + readedLen, readLen);
       leftToRead -= readLen;
       readedLen += readLen;
-      mCurrBytebufReadedLength += readedLen;
-      mPos += readedLen;
+      mCurrBytebufReadedLength += readLen;
+      mPos += readLen;
       if (mCurrBytebufReadedLength == current.capacity()) {
         current = forward();
+        mCurrBytebufReadedLength = 0;
         if (current == null) {
           break;
         }
@@ -98,7 +102,7 @@ public class CacheFileInputStream extends InputStream {
   }
 
   public int remaining() {
-    return mFileLength - mPos;
+    return (int)mFileLength - mPos;
   }
 
 }

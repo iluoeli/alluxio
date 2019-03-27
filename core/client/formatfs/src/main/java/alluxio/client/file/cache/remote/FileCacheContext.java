@@ -41,14 +41,17 @@ public enum FileCacheContext {
   }
 
   public void produceData(long msgId, RemoteReadResponse readResponse) {
-    System.out.println("get data " + readResponse.toString());
     mDataProducer.get(msgId).consume(readResponse);
   }
 
   public void finishProduce(long msgId) {
-    mDataProducer.get(msgId).isFinishSending.getAndSet(true);
     mDataProducer.remove(msgId);
   }
+
+  public void addLengthInfo(long msgId, long fileLength) {
+    mDataProducer.get(msgId).setFileLength(fileLength);
+  }
+
 
   public void initProducer(long msgId, RemoteFileInputStream in) {
     mDataProducer.put(msgId, in);

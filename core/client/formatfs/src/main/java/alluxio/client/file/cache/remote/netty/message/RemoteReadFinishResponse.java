@@ -8,32 +8,40 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class RemoteReadFinishResponse extends RPCMessage {
-  boolean succeed;
+  long mFileLength;
 
-  public RemoteReadFinishResponse(boolean succeed, long msgId) {
+  public RemoteReadFinishResponse(long msgId, long fileLength) {
     super(msgId);
-    this.succeed = succeed;
+    mFileLength = fileLength;
+  }
+
+  public long getFileLength() {
+    return mFileLength;
   }
 
   @Override
   public Type getType() {
-    return Type.REMOTE_READ_RESPONSE;
+    return Type.REMOTE_READ_FINISH_RESPONSE;
   }
 
   @Override
   public void encode(ByteBuf out) {
-    out.writeBoolean(succeed);
+    out.writeLong(mFileLength);
     encodeMessageId(out);
   }
 
   @Override
   public int getEncodedLength() {
-    return Integer.BYTES + getMessageIdEncodedlength();
+    return Long.BYTES + getMessageIdEncodedlength();
   }
 
   public static RemoteReadFinishResponse decode(ByteBuf in) throws IOException {
-    boolean succeed = in.readBoolean();
+    long fileLength = in.readLong();
     long messageId = decodeMessageId(in);
-    return new RemoteReadFinishResponse(succeed, messageId);
+    return new RemoteReadFinishResponse(messageId, fileLength);
+  }
+
+  public String toString() {
+    return "finish : " + " length " + mFileLength;
   }
 }
