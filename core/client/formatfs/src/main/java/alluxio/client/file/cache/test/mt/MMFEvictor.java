@@ -9,13 +9,11 @@ public class MMFEvictor extends MTLRUEvictor {
   }
 
 
-
-
   @Override
   public void access(long userId, TmpCacheUnit unit) {
     if (!actualEvictContext.containsKey(userId)) {
       //if (userId == 1) {
-        actualEvictContext.put(userId, new LRUEvictContext(this, mContext, userId));
+        actualEvictContext.put(userId, new LFUEvictContext(this, mContext, userId));
      // } else if (userId == 2) {
      //   actualEvictContext.put(userId, new LFUEvictContext(this, mContext, userId));
      // } else {
@@ -33,7 +31,7 @@ public class MMFEvictor extends MTLRUEvictor {
     }
 
     if (!baseEvictCotext.containsKey(userId)) {
-      LRUEvictContext base = new LRUEvictContext(this, new ClientCacheContext(false), userId);
+      LFUEvictContext base = new LFUEvictContext(this, new ClientCacheContext(false), userId);
       base.resetCapacity(cacheSize);
       baseEvictCotext.put(userId, base);
     }
@@ -62,6 +60,6 @@ public class MMFEvictor extends MTLRUEvictor {
 
   public static void main(String[] args) {
     MMFEvictor test = new MMFEvictor(new ClientCacheContext(false));
-    test.testCheatAccess();
+    test.test();
   }
 }

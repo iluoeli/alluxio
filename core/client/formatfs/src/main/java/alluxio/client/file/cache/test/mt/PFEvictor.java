@@ -47,10 +47,10 @@ public class PFEvictor extends MTLRUEvictor {
           tmpSum += context1.mAccessMap.get(tmp);
         }
       }
-     // res += Math.log(tmpSum);
-      res += tmpSum;
+      res += Math.log(tmpSum);
+      //res += tmpSum;
     }
-    double usedRatio = (double) actualEvictContext.get(userId).mCacheSize / (double)cacheSize;
+    double usedRatio =  actualEvictContext.get(userId).mCacheSize / (double)cacheSize;
     return res / (usedRatio == 0? 0.0000001 : usedRatio);
   }
 
@@ -82,12 +82,12 @@ public class PFEvictor extends MTLRUEvictor {
       //System.out.println("============");
       for (long userId : actualEvictContext.keySet()) {
         double tmpCost =  computePFValueWhenCheat(userId);
-        if (tmpCost > maxValue) {
+        if (tmpCost > maxValue ) {
           maxValue = tmpCost;
           maxCostId = userId;
         }
       }
-      //System.out.println(maxCostId +  " " + maxValue);
+     // System.out.println(maxCostId +  " " + maxValue);
       TmpCacheUnit unit = actualEvictContext.get(maxCostId).getEvictUnit();
       actualSize -=  actualEvictContext.get(maxCostId).remove(unit);
       checkRemoveByShare(unit, maxCostId);
@@ -96,7 +96,7 @@ public class PFEvictor extends MTLRUEvictor {
 
   public static void main(String[] args) {
     PFEvictor test = new PFEvictor(new ClientCacheContext(false));
-    test.testCheatAccess();
+    test.test();
   }
 
 }

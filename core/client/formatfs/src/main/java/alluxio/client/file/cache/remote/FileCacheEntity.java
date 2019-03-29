@@ -28,6 +28,7 @@ public class FileCacheEntity extends CacheInternalUnit {
 
   public FileCacheEntity(long fileId, String filePath, long fileLength) {
     super(0, fileLength , fileId);
+    mFileLength = fileLength;
     try {
       RandomAccessFile randomAccessFile = new RandomAccessFile(filePath, "r");
       mChannel = randomAccessFile.getChannel();

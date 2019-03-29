@@ -20,6 +20,7 @@ public class CacheFileInputStream extends InputStream {
     mCacheContext = FileCacheContext.INSTANCE;
     mData = mCacheContext.getCache(fileId);
     resetIndex();
+    mFileLength = mData.getFileLength();
   }
 
   public void resetIndex() {
@@ -54,11 +55,13 @@ public class CacheFileInputStream extends InputStream {
     if (current == null) {
       return -1;
     }
+    System.out.println("test " + current.capacity() + " " + leftToRead + " " + mFileLength + " " + mPos);
     int currentBytebyfCanReadLen = current.capacity() - mCurrBytebufReadedLength;
 
     while (leftToRead > 0) {
       int readLen = Math.min(currentBytebyfCanReadLen, leftToRead);
       current.getBytes(0, b, off + readedLen, readLen);
+      System.out.println("read "  + readLen);
       leftToRead -= readLen;
       readedLen += readLen;
       mCurrBytebufReadedLength += readLen;

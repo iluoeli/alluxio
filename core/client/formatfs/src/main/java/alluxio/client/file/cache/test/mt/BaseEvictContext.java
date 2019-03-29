@@ -1,6 +1,7 @@
 package alluxio.client.file.cache.test.mt;
 
 import alluxio.client.file.cache.*;
+import com.google.common.base.Preconditions;
 
 import java.util.HashSet;
 import java.util.List;
@@ -20,6 +21,7 @@ public abstract class BaseEvictContext {
   private double mLastHRD;
   long mUserId;
   protected MTLRUEvictor mtlruEvictor;
+  public static Set<TmpCacheUnit> testSet = new HashSet<>();
 
   public double computePartialHitRatio() {
     if(mVisitSize == mLastVisitSize) {
@@ -46,14 +48,34 @@ public abstract class BaseEvictContext {
     return this;
   }
 
+  public long accessByShare(TmpCacheUnit unit,ClientCacheContext context) {
+     Set<Long> shareSet = mtlruEvictor.mShareSet.get(unit);
+     long newSize = access(unit, false);
+     if (shareSet != null && newSize > 0) {
+       if (!shareSet.contains(mUserId) || shareSet.size() > 1) {
+
+         long shareNumber = shareSet.contains(mUserId) ? shareSet.size() : shareSet.size() + 1;
+         mHitSize += (double) unit.getSize() / shareNumber;
+         double otherUserPart = ((double) unit.getSize() / (double) shareNumber) * (shareNumber - 1);
+         mCacheSize -= otherUserPart;
+         mVisitSize -= otherUserPart;
+        // mHitSize += (double) unit.getSize();
+         //mCacheSize -= otherUserPart;
+        // mVisitSize -= otherUserPart;
+       }
+     }
+     return newSize;
+  }
+
+  /*
   public long accessByShare(TmpCacheUnit unit, ClientCacheContext sharedContext) {
     CacheUnit unit1 = sharedContext.getCache(unit.getFileId(), mTestFileLength, unit.getBegin(), unit.getEnd(), unlockTask);
     if (unit1.isFinish()) {
-      access(unit, false);
+      access(unit);
     }
-    return access(unit, false);
-  }
+    return access(unit);
 
+  }*/
 
   long access0(TmpCacheUnit unit, boolean isActual) {
     long newSize = 0;
@@ -61,16 +83,16 @@ public abstract class BaseEvictContext {
     CacheUnit res1 = mCacheContext.getCache(unit.getFileId(), mTestFileLength, unit.getBegin(), unit.getEnd(), unlockTask);
     if (!res1.isFinish()) {
       TempCacheUnit unit1 = (TempCacheUnit)res1;
-      long missSize = mCacheContext.computeIncrese(unit1);
-      mHitSize += (unit.getSize() - missSize);
       mCacheContext.addCache(unit1);
-      newSize += missSize;
+      newSize = unit.getSize();
       mCacheSize += newSize;
     } else {
       mHitSize += unit.getSize();
     }
     if (isActual) {
+     // ((LFUEvictContext)this).check();
       shareCount(unit, newSize > 0);
+     // ((LFUEvictContext)this).check();
     }
     return newSize;
   }
@@ -79,18 +101,11 @@ public abstract class BaseEvictContext {
   public void shareCount(TmpCacheUnit unit, boolean isNew) {
     if (isNew) {
       if (mtlruEvictor.mShareSet.containsKey(unit)) {
-        mCacheSize -= unit.getSize();
-        Set<Long> shareUser = mtlruEvictor.mShareSet.get(unit);
-        if (!shareUser.contains(mUserId)) {
-          shareUser.add(mUserId);
-        }
-        double reAddSize = (double) unit.getSize() / (double) shareUser.size();
-        for (long id : shareUser) {
-          mtlruEvictor.actualEvictContext.get(id).mCacheSize +=reAddSize;
-        }
+        throw new RuntimeException("bug");
       } else {
         mtlruEvictor.mShareSet.put(unit, new HashSet<>());
         mtlruEvictor.mShareSet.get(unit).add(mUserId);
+        testSet.add(unit);
       }
     } else {
       Set<Long> shareUser = mtlruEvictor.mShareSet.get(unit);
@@ -106,6 +121,7 @@ public abstract class BaseEvictContext {
           reAddSize = (double) unit.getSize() / (double) shareUser.size();
           for (long id : shareUser) {
             mtlruEvictor.actualEvictContext.get(id).mCacheSize +=reAddSize;
+            //((LFUEvictContext)mtlruEvictor.actualEvictContext.get(id)).check();
           }
         }
       }
@@ -129,20 +145,28 @@ public abstract class BaseEvictContext {
 
   public void shareDelete(TmpCacheUnit deleteUnit) {
     double needDeleteSize = (double) deleteUnit.getSize() / (double) mtlruEvictor.mShareSet.get(deleteUnit).size();
-    for (long id : mtlruEvictor.mShareSet.get(deleteUnit)) {
+    Set<Long> tmp = new HashSet<>(mtlruEvictor.mShareSet.get(deleteUnit));
+
+    mtlruEvictor.mShareSet.remove(deleteUnit);
+    for (long id : tmp) {
       mtlruEvictor.actualEvictContext.get(id).mCacheSize -= needDeleteSize;
+      mtlruEvictor.actualEvictContext.get(id).fakeRemove(deleteUnit);
     }
   }
 
 
-  long remove0(TmpCacheUnit deleteUnit) {
+  private long remove0(TmpCacheUnit deleteUnit, boolean isActual) {
     CacheUnit unit = mCacheContext.getCache(deleteUnit.getFileId(), mTestFileLength, deleteUnit.getBegin(),
             deleteUnit.getEnd(), unlockTask);
     long res = 0;
     if (unit.isFinish()) {
       mCacheContext.delete((CacheInternalUnit) unit);
-      shareDelete(deleteUnit);
+      if (isActual) {
+        shareDelete(deleteUnit);
+      }
       res += unit.getSize();
+    } else {
+      throw new RuntimeException("bug");
     }
     return res;
   }
@@ -159,9 +183,18 @@ public abstract class BaseEvictContext {
     return access0(unit, isActual);
   }
 
+  public long remove(TmpCacheUnit unit, boolean isActual) {
+    fakeRemove(unit);
+    return remove0(unit, isActual);
+  }
+
+  public long remove(TmpCacheUnit unit) {
+    return remove(unit, true);
+  }
+
   public abstract void fakeAccess(TmpCacheUnit unit);
 
-  public abstract long remove(TmpCacheUnit unit);
+  public abstract void fakeRemove(TmpCacheUnit unit);
 
   public abstract TmpCacheUnit getEvictUnit();
 

@@ -62,13 +62,13 @@ public class LIRSEvictContext extends BaseEvictContext {
     }
   }
 
-  public long remove(TmpCacheUnit unit){
+
+  public void fakeRemove(TmpCacheUnit unit){
     mAccessSet.remove(unit);
     HIRlist.remove(unit);
     if (LIRList.contains(unit)) {
       LIRList.remove(unit);
     }
-    return remove0(unit);
   }
 
   public TmpCacheUnit getEvictUnit() {

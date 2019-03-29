@@ -1,10 +1,12 @@
 package alluxio.client.file.cache.remote.netty;
 
 import alluxio.client.file.cache.remote.FileCacheContext;
+import alluxio.client.file.cache.remote.MappedCacheEntity;
 import alluxio.client.file.cache.remote.netty.message.RPCMessage;
 import alluxio.client.file.cache.remote.netty.message.RemoteReadFinishResponse;
 import alluxio.client.file.cache.remote.netty.message.RemoteReadRequest;
 import alluxio.client.file.cache.remote.netty.message.RemoteReadResponse;
+import alluxio.client.file.cache.remote.stream.CacheFileInputStream;
 import alluxio.client.file.cache.remote.stream.RemoteFileInputStream;
 import alluxio.util.ThreadFactoryUtils;
 import com.google.common.base.Preconditions;
@@ -14,10 +16,14 @@ import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.nio.NioSocketChannel;
 import io.netty.channel.unix.DomainSocketChannel;
 
+import java.io.ByteArrayInputStream;
+import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
+import java.nio.MappedByteBuffer;
 import java.util.Random;
 import java.util.concurrent.ThreadFactory;
 
@@ -138,9 +144,35 @@ public final class CacheClient {
       throw new RuntimeException(cause);
     }
   }
+
+
+  public void writeIntoRamFsTest() throws Exception {
+    /*
+    byte[] b = new byte[1024* 1024 * 20];
+    for (int i = 0 ;i < b.length; i ++) {
+      b[i] = (byte)i;
+    }
+    InputStream in = new ByteArrayInputStream(b);
+    FileCacheContext.INSTANCE.addLocalFileCache("/dev/shm/test", in);
+    File f = new File("/dev/shm/test");
+    */
+    MappedCacheEntity entity = new MappedCacheEntity(1, "/dev/shm/test", 20  *1024 * 1024);
+    FileCacheContext.INSTANCE.addCache(1, entity);
+    CacheFileInputStream in1 = new CacheFileInputStream(1);
+    int tmp = 0;
+    int read = 0;
+    byte[] b1 = new byte[1024 * 1024];
+    while ((tmp = in1.read(b1)) != -1) {
+      read += tmp;
+      System.out.println(tmp);
+    }
+    Preconditions.checkArgument(read == 20 * 1024 * 1024);
+
+  }
+
   public static void main(String[] arg) throws Exception{
     CacheClient cacheClient = new CacheClient();
-    cacheClient.testRead();
+    cacheClient.writeIntoRamFsTest();
     System.out.println("===============finish===============");
   }
 }

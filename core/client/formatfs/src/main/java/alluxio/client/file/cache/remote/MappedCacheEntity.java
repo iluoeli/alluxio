@@ -4,6 +4,7 @@ import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 
 import java.io.IOException;
+import java.nio.MappedByteBuffer;
 import java.nio.channels.FileChannel;
 
 public class MappedCacheEntity extends FileCacheEntity {
@@ -12,7 +13,7 @@ public class MappedCacheEntity extends FileCacheEntity {
 
   public MappedCacheEntity(long fileId, String filePath, long fileLength) {
     super(fileId , filePath, fileLength);
-    mMappedIndex = 0;
+    mMappedIndex = -1;
     mCurrentMappedLength = 0;
   }
 
@@ -20,7 +21,8 @@ public class MappedCacheEntity extends FileCacheEntity {
     if (index > mMappedIndex) {
       for (int i = mMappedIndex + 1; i <= index; i++) {
         int buflength = Math.min(bufferLength, (int)mFileLength - mCurrentMappedLength);
-        mData.add(Unpooled.wrappedBuffer(mChannel.map(FileChannel.MapMode.READ_ONLY, mCurrentMappedLength, buflength)));
+        MappedByteBuffer buffer = mChannel.map(FileChannel.MapMode.READ_ONLY, mCurrentMappedLength, buflength);
+        mData.add(Unpooled.wrappedBuffer(buffer));
         mCurrentMappedLength += bufferLength;
         mMappedIndex ++;
       }

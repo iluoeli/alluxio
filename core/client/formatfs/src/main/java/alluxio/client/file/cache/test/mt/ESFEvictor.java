@@ -1,6 +1,8 @@
 package alluxio.client.file.cache.test.mt;
 
 import alluxio.client.file.cache.ClientCacheContext;
+import org.apache.commons.lang3.RandomUtils;
+import org.apache.hadoop.yarn.webapp.hamlet.Hamlet;
 
 public class ESFEvictor extends MTLRUEvictor {
 
@@ -13,7 +15,7 @@ public class ESFEvictor extends MTLRUEvictor {
   @Override
   public void access(long userId, TmpCacheUnit unit) {
     if (!actualEvictContext.containsKey(userId)) {
-      actualEvictContext.put(userId, new LRUEvictContext(this, mContext, userId));
+      actualEvictContext.put(userId, new LFUEvictContext(this, mContext, userId));
     }
     long actualNew = actualEvictContext.get(userId).access(unit);
 
@@ -26,7 +28,7 @@ public class ESFEvictor extends MTLRUEvictor {
 
 
     if (!baseEvictCotext.containsKey(userId)) {
-      LRUEvictContext base = new LRUEvictContext(this, new ClientCacheContext(false), userId);
+      LFUEvictContext base = new LFUEvictContext(this, new ClientCacheContext(false), userId);
       base.resetCapacity(cacheSize);
       baseEvictCotext.put(userId, base);
     }
@@ -35,8 +37,11 @@ public class ESFEvictor extends MTLRUEvictor {
   }
 
   private double getHRDCost(double HRD, long userId) {
-    System.out.println(userId + " " + HRD);
-    return (HRD) * 100  / ((double)(actualEvictContext.get(userId).mCacheSize) / (double)cacheSize);
+    //System.out.println(HRD  + " : " + userId + " : " +( ((double)(actualEvictContext.get(userId).mCacheSize) / (double)cacheSize)));
+    double usedRatio = ((actualEvictContext.get(userId).mCacheSize) / cacheSize);
+    //System.out.println("user " + userId + " " + HRD + " : " + usedRatio);
+
+    return (HRD) * 100 * usedRatio;
   }
 
   private double getHRDCostWhenCheat(double HRD, long userId) {
@@ -44,7 +49,46 @@ public class ESFEvictor extends MTLRUEvictor {
     if(usedRatio == 0) {
       return 0;
     }
-    return (HRD) * 100  / usedRatio;
+    return (HRD) * 100 / usedRatio;
+  }
+
+  private boolean isIsolateGanaratee(long userId) {
+    double usedRatio = ((double)(actualEvictContext.get(userId).mCacheSize) / (double)cacheSize);
+    double hitRatio =(actualEvictContext.get(userId).computePartialHitRatio() / baseEvictCotext.get(userId).computePartialHitRatio());
+    double lowestRatio =  1 / (double)actualEvictContext.size();
+    //System.out.println("test " + usedRatio + " : " + hitRatio + " : " + lowestRatio);
+    return usedRatio >= lowestRatio && hitRatio >= lowestRatio;
+  }
+
+  private long getMostUsedCache() {
+    double maxSize = 0;
+    long maxUserId = -1;
+    for (long userId : actualEvictContext.keySet()) {
+      BaseEvictContext context = actualEvictContext.get(userId);
+      double usedSize = context.mCacheSize;
+      if (usedSize > maxSize) {
+        maxSize = usedSize;
+        maxUserId = userId;
+      }
+    }
+    return maxUserId;
+  }
+
+  private long getLargestHRD() {
+    double minHRDCost = Integer.MAX_VALUE;
+    long minCostUserId = -1;
+    for (long userId : actualEvictContext.keySet()) {
+      double actualHitRatio = actualEvictContext.get(userId).computePartialHitRatio();
+      double baseHitRatio = baseEvictCotext.get(userId).computePartialHitRatio();
+      double HRDCost = getHRDCostWhenCheat(baseHitRatio - actualHitRatio, userId);
+      System.out.println(baseHitRatio + " " +  actualHitRatio + "  " +((double)(actualEvictContext.get(userId).mCacheSize) / (double)cacheSize));
+      if (HRDCost < minHRDCost && actualEvictContext.get(userId).mCacheSize > 0
+              && actualEvictContext.get(userId).getEvictUnit()!= null){
+        minHRDCost = HRDCost;
+        minCostUserId = userId;
+      }
+    }
+    return minCostUserId;
   }
 
   public void evict() {
@@ -55,25 +99,33 @@ public class ESFEvictor extends MTLRUEvictor {
       for (long userId : actualEvictContext.keySet()) {
         double actualHitRatio = actualEvictContext.get(userId).computePartialHitRatio();
         double baseHitRatio = baseEvictCotext.get(userId).computePartialHitRatio();
-        double HRDCost = getHRDCostWhenCheat(baseHitRatio - actualHitRatio, userId);
+        double HRDCost = getHRDCost(baseHitRatio - actualHitRatio, userId);
         //System.out.println(userId  +" " + actualHitRatio + " "+baseHitRatio + " " +HRDCost);
        // System.out.println(userId + " cache size " +(actualEvictContext.get(userId).mCacheSize) / (1024 * 1024) + " || " + cacheSize/ ( 1024 * 1024));
         if (HRDCost < minHRDCost && actualEvictContext.get(userId).mCacheSize > 0
-                && actualEvictContext.get(userId).getEvictUnit()!= null){
+                && actualEvictContext.get(userId).getEvictUnit()!= null
+                ){
           minHRDCost = HRDCost;
           minCostUserId = userId;
         }
       }
-      //System.out.println(minCostUserId+ " " + actualEvictContext.get(minCostUserId).mCacheSize/ (1024 * 1024));
+      if (minCostUserId == -1) {
+        //System.out.println("===========================");
+        minCostUserId = getLargestHRD();
+       // System.out.println(minCostUserId);
+       // System.out.println("===========================");
+      }
+
+      //System.out.println("evict " + minCostUserId);
+
       TmpCacheUnit unit = actualEvictContext.get(minCostUserId).getEvictUnit();
       actualSize -=  actualEvictContext.get(minCostUserId).remove(unit);
       checkRemoveByShare(unit, minCostUserId);
     }
-   // System.out.println("================");
   }
 
   public static void main(String [] args) {
     ESFEvictor esfTest = new ESFEvictor(new ClientCacheContext(false));
-    esfTest.testCheatAccess();
+    esfTest.test();
   }
 }

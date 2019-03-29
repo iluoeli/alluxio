@@ -6,6 +6,7 @@ import alluxio.client.file.cache.remote.stream.RemoteFileInputStream;
 import alluxio.util.io.BufferUtils;
 import io.netty.buffer.ByteBuf;
 
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.RandomAccessFile;
@@ -71,7 +72,10 @@ public enum FileCacheContext {
    * @param in the data source
    */
   public void addLocalFileCache(String filePath, InputStream in) throws IOException {
-
+    File f = new File(filePath);
+    if (f.exists()) {
+      f.delete();
+    }
     int readLen = 0;
     byte[] tmp = new byte[LOCAL_BUFFER_SIZE];
     RandomAccessFile cacheFile = new RandomAccessFile(filePath, "rw");
@@ -79,11 +83,15 @@ public enum FileCacheContext {
     int pos = 0;
 
     while ((readLen = in.read(tmp))!=-1) {
-      MappedByteBuffer buffer = channel.map(FileChannel.MapMode.READ_WRITE,pos , readLen);
+      System.out.println(readLen + " " + pos);
+      MappedByteBuffer buffer = channel.map(FileChannel.MapMode.READ_WRITE, pos , readLen);
+
       buffer.put(tmp, 0, readLen);
       BufferUtils.cleanDirectBuffer(buffer);
       pos += readLen;
+      System.out.println(channel.size());
     }
     in.close();
+    cacheFile.close();
   }
 }

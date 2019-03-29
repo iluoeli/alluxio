@@ -50,12 +50,9 @@ public class LRUEvictContext extends BaseEvictContext {
     }
   }
 
-  public long remove(TmpCacheUnit deleteUnit) {
-    if (accessSet.contains(deleteUnit)) {
-      mLRUList.remove(deleteUnit);
-      accessSet.remove(deleteUnit);
-    }
-    return remove0(deleteUnit);
+  public void fakeRemove(TmpCacheUnit deleteUnit){
+    mLRUList.remove(deleteUnit);
+    accessSet.remove(deleteUnit);
   }
 
   public void test () {

@@ -52,7 +52,7 @@ public class SequentialMTLRUEvictor extends LRUEvictor {
         cachespace -= lowest.getSize();
 
         accessList.remove(lowest);
-        baseEvictCotext.get(lowest.mClientIndex).remove(lowest);
+        baseEvictCotext.get(lowest.mClientIndex).remove(lowest, false);
         for (TmpCacheUnit unit2 : accessList) {
           p.remove(unit2);
           unit2.mCost -= lowest.mCost;
