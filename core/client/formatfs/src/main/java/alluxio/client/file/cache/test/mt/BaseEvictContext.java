@@ -100,31 +100,25 @@ public abstract class BaseEvictContext {
 
   public void shareCount(TmpCacheUnit unit, boolean isNew) {
     if (isNew) {
-      if (mtlruEvictor.mShareSet.containsKey(unit)) {
-        throw new RuntimeException("bug");
-      } else {
-        mtlruEvictor.mShareSet.put(unit, new HashSet<>());
-        mtlruEvictor.mShareSet.get(unit).add(mUserId);
-        testSet.add(unit);
-      }
+      mtlruEvictor.mShareSet.put(unit, new HashSet<>());
+      mtlruEvictor.mShareSet.get(unit).add(mUserId);
+      testSet.add(unit);
     } else {
       Set<Long> shareUser = mtlruEvictor.mShareSet.get(unit);
-      if (shareUser == null) {
-        throw new RuntimeException("bug");
-      } else {
-        if (!shareUser.contains(mUserId)) {
-          double reAddSize = (double) unit.getSize() / (double) shareUser.size();
-          for (long id : shareUser) {
-            mtlruEvictor.actualEvictContext.get(id).mCacheSize -=reAddSize;
-          }
-          shareUser.add(mUserId);
-          reAddSize = (double) unit.getSize() / (double) shareUser.size();
-          for (long id : shareUser) {
-            mtlruEvictor.actualEvictContext.get(id).mCacheSize +=reAddSize;
-            //((LFUEvictContext)mtlruEvictor.actualEvictContext.get(id)).check();
-          }
+      Preconditions.checkNotNull(shareUser);
+
+      if (!shareUser.contains(mUserId)) {
+        double reAddSize = (double) unit.getSize() / (double) shareUser.size();
+        for (long id : shareUser) {
+          mtlruEvictor.actualEvictContext.get(id).mCacheSize -= reAddSize;
+        }
+        shareUser.add(mUserId);
+        reAddSize = (double) unit.getSize() / (double) shareUser.size();
+        for (long id : shareUser) {
+          mtlruEvictor.actualEvictContext.get(id).mCacheSize +=reAddSize;
         }
       }
+
     }
   }
 

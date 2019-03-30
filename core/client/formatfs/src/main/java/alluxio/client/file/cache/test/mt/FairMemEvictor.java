@@ -52,7 +52,7 @@ public class FairMemEvictor extends MTLRUEvictor {
 
   public static void main(String[] args) {
     FairMemEvictor evictor = new FairMemEvictor(new ClientCacheContext(false));
-    evictor.test();
+    evictor.testUserNum_3();
   }
 
   class BaseAllocateContext {

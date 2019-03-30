@@ -41,7 +41,7 @@ public class ESFEvictor extends MTLRUEvictor {
     double usedRatio = ((actualEvictContext.get(userId).mCacheSize) / cacheSize);
     //System.out.println("user " + userId + " " + HRD + " : " + usedRatio);
 
-    return (HRD) * 100 * usedRatio;
+    return (HRD) * 100 * usedRatio  ;
   }
 
   private double getHRDCostWhenCheat(double HRD, long userId) {
@@ -80,7 +80,7 @@ public class ESFEvictor extends MTLRUEvictor {
     for (long userId : actualEvictContext.keySet()) {
       double actualHitRatio = actualEvictContext.get(userId).computePartialHitRatio();
       double baseHitRatio = baseEvictCotext.get(userId).computePartialHitRatio();
-      double HRDCost = getHRDCostWhenCheat(baseHitRatio - actualHitRatio, userId);
+      double HRDCost = getHRDCost(baseHitRatio - actualHitRatio, userId);
       //System.out.println(baseHitRatio + " " +  actualHitRatio + "  " +((double)(actualEvictContext.get(userId).mCacheSize) / (double)cacheSize));
       if (HRDCost < minHRDCost && actualEvictContext.get(userId).mCacheSize > 0
               && actualEvictContext.get(userId).getEvictUnit()!= null ){
@@ -99,12 +99,13 @@ public class ESFEvictor extends MTLRUEvictor {
       for (long userId : actualEvictContext.keySet()) {
         double actualHitRatio = actualEvictContext.get(userId).computePartialHitRatio();
         double baseHitRatio = baseEvictCotext.get(userId).computePartialHitRatio();
-        double HRDCost = getHRDCostWhenCheat(baseHitRatio - actualHitRatio, userId);
+        double HRDCost = getHRDCost(baseHitRatio - actualHitRatio, userId);
         //System.out.println(userId  +" " + actualHitRatio + " "+baseHitRatio + " " +HRDCost);
        // System.out.println(userId + " cache size " +(actualEvictContext.get(userId).mCacheSize) / (1024 * 1024) + " || " + cacheSize/ ( 1024 * 1024));
         if (HRDCost < minHRDCost && actualEvictContext.get(userId).mCacheSize > 0
                 && actualEvictContext.get(userId).getEvictUnit()!= null
-               && isIsolateGanaratee(userId) ){
+              // && isIsolateGanaratee(userId)
+                ){
           minHRDCost = HRDCost;
           minCostUserId = userId;
         }
@@ -124,6 +125,6 @@ public class ESFEvictor extends MTLRUEvictor {
 
   public static void main(String [] args) {
     ESFEvictor esfTest = new ESFEvictor(new ClientCacheContext(false));
-    esfTest.testCheatAccess();
+    esfTest.testUserNum_3();
   }
 }

@@ -213,39 +213,16 @@ public class MTLRUEvictor extends LRUEvictor {
     }
   }
 
-  public void test() {
-    ZipfGenerator generator0 = new ZipfGenerator(1000, 0.3);
+  public void testUserNum_3() {
+    ZipfGenerator generator0 = new ZipfGenerator(1023, 0.3);
     ZipfGenerator generator1 = new ZipfGenerator(512, 0.3);
     ZipfGenerator generator2 = new ZipfGenerator(256, 0.3);
-    //LRUGenerator generator0 = new LRUGenerator(1024);
-    //LRUGenerator generator1 = new LRUGenerator(512);
-   // LRUGenerator generator2 = new LRUGenerator(256);
-    ZipfGenerator userGenerator = new ZipfGenerator(3, 0.5);
-    ZipfGenerator fileIDGenerator = new ZipfGenerator(3, 9);
-    LRUGenerator generator = new LRUGenerator(200);
-    for (int i = 0; i < 10; i ++) {
       System.out.println("==================================================");
-      mAccessCollecter.clear();
-      //mShareSet.clear();
-     // mAccessSize = mHitSize = 0;
-      //if (i == 10) {
-        for (long userId : actualEvictContext.keySet()) {
-         actualEvictContext.get(userId).initAccessRecord();
-        }
-        for (long userId : baseEvictCotext.keySet()) {
-          baseEvictCotext.get(userId).initAccessRecord();
-        }
-     // }
-      boolean reverse = false;
       for (int j = 0; j < 3000; j ++) {
-
-        //randomIndex = userGenerator.next();
-
-        //  randomIndex = userGenerator.next() +1;
+        if (j %3 == 0) {
+          evictCheck();
+        }
         int tmp;
-        //userMap.get((long)randomIndex).next();
-        //int randomIndex =  userGenerator.next();
-
         int randomIndex = RandomUtils.nextInt(0, 3);
         if (randomIndex < 2) {
           int randomIndex1 = RandomUtils.nextInt(0, 2);
@@ -260,77 +237,134 @@ public class MTLRUEvictor extends LRUEvictor {
           tmp = RandomUtils.nextInt(0, 512);
           //tmp = generator1.next();
         } else {
-          tmp = RandomUtils.nextInt(0, 256);
+          tmp = RandomUtils.nextInt(0, 200);
           //tmp = generator2.next();
         }
-        //tmp = RandomUtils.nextInt(0, 1000);
-        //long userId =
-        // if (userId >= 2) {
-        //   int tmp1 = RandomUtils.nextInt(0, 10);
-        //   if (tmp1 != 0) {
-        //     userId = RandomUtils.nextInt(0, 5);
-        //   }
-        // }
         long userId = randomIndex;
         long begin = 1024 * 1024 * tmp;
         long end = begin + 1024 * 1024;
         TmpCacheUnit unit = new TmpCacheUnit(1, begin, end);
         access(userId, unit);
       }
-      /*
-      for (int j = 0; j < 3072; j ++) {
-        if (j % 3 == 0) {
+      System.out.println("all : " + (double) mHitSize / (double) mAccessSize);
+
+      System.out.println("actual : ");
+      for (long userId1 : actualEvictContext.keySet()) {
+        System.out.println(userId1 + " : " + actualEvictContext.get(userId1).computePartialHitRatio());
+      }
+
+  }
+
+  public void testUserNum_5() {
+    //ZipfGenerator generator0 = new ZipfGenerator(1023, 0.3);
+   // ZipfGenerator generator1 = new ZipfGenerator(512, 0.3);
+    //ZipfGenerator generator2 = new ZipfGenerator(256, 0.3);
+
+    ZipfGenerator userGenerator = new ZipfGenerator(5, 2);
+    for (int i = 0; i < 1; i ++) {
+      System.out.println("==================================================");
+      for (int j = 0; j < 3000; j ++) {
+        if (j %3 == 0) {
           evictCheck();
         }
-        int tmp = RandomUtils.nextInt(0, 512);
-        long userId = RandomUtils.nextInt(0, 3);
+        int tmp;
+        int randomIndex = (5 - userGenerator.next());
+        if (randomIndex % 5 == 0) {
+          tmp = RandomUtils.nextInt(0, 1023);
+        } else if (randomIndex % 5 == 1) {
+          tmp = RandomUtils.nextInt(0, 800);
+        } else if (randomIndex % 5 == 2) {
+          tmp = RandomUtils.nextInt(0, 600);
+        } else if (randomIndex % 5 == 3) {
+          tmp = RandomUtils.nextInt(0, 400);
+        }  else  {
+          tmp = RandomUtils.nextInt(0, 200);
+        }
 
+        long userId = randomIndex;
         long begin = 1024 * 1024 * tmp;
         long end = begin + 1024 * 1024;
-        TmpCacheUnit unit = new TmpCacheUnit(mTestFileId, begin, end);
+        TmpCacheUnit unit = new TmpCacheUnit(1, begin, end);
         access(userId, unit);
       }
-     */
-        //if (j % 10 == 0) {
-          System.out.println("all : " + (double) mHitSize / (double) mAccessSize);
 
-          System.out.println("actual : ");
-          for (long userId1 : actualEvictContext.keySet()) {
-            System.out.println(userId1 + " : " + actualEvictContext.get(userId1).computePartialHitRatio());
-          }
+      System.out.println("all : " + (double) mHitSize / (double) mAccessSize);
 
-          System.out.println("base : ");
-          for (long userId1 : baseEvictCotext.keySet()) {
-            System.out.println(userId1 + " : " + baseEvictCotext.get(userId1).computePartialHitRatio());
-          }
-/*
-          System.out.println("only one : ");
-          System.out.println(mBaseEvictContext.computePartialHitRatio());
-          //System.out.println("access share ratio : " + (double)mShareVisitSize / (double)mAccessSize );
-          long shareSize = 0;
-          for (TmpCacheUnit u : mShareSet.keySet()) {
-            Set<Long> s = mShareSet.get(u);
-            if (s.size() > 1) {
-              shareSize++;
-            }
-          }
-          System.out.println("storage share ratio : " + (double) shareSize / (double) mShareSet.size());
-          shareSize = 0;
-          long acc = 0;
-          for (TmpCacheUnit uu : mAccessCollecter) {
-            if (mShareSet.get(uu).size() > 1) {
-              shareSize += uu.getSize();
-            }
-            acc += uu.getSize();
-          }
-
-          System.out.println("visit share ratio :" + (double) shareSize / (double) acc);
-
-          System.out.println(getFairnessIndex());*/
-       // }
-
+      System.out.println("actual : ");
+      for (long userId1 : actualEvictContext.keySet()) {
+        System.out.println(userId1 + " : " + actualEvictContext.get(userId1).computePartialHitRatio());
+      }
     }
   }
+
+  public void testUserNum_10() {
+    //ZipfGenerator generator0 = new ZipfGenerator(1023, 0.3);
+    // ZipfGenerator generator1 = new ZipfGenerator(512, 0.3);
+    //ZipfGenerator generator2 = new ZipfGenerator(256, 0.3);
+
+    ZipfGenerator userGenerator = new ZipfGenerator(10, 1);
+    for (int i = 0; i < 1; i ++) {
+      System.out.println("==================================================");
+      for (int j = 0; j < 3000; j ++) {
+        if (j %3 == 0) {
+          evictCheck();
+        }
+        int tmp;
+        int randomIndex = (10 - userGenerator.next());
+        tmp = RandomUtils.nextInt(0, (10 - randomIndex) * 100);
+
+        long userId = randomIndex;
+        long begin = 1024 * 1024 * tmp;
+        long end = begin + 1024 * 1024;
+        TmpCacheUnit unit = new TmpCacheUnit(1, begin, end);
+        access(userId, unit);
+      }
+
+      System.out.println("all : " + (double) mHitSize / (double) mAccessSize);
+
+      System.out.println("actual : ");
+      for (long userId1 : actualEvictContext.keySet()) {
+        System.out.println(userId1 + " : " + actualEvictContext.get(userId1).computePartialHitRatio());
+      }
+    }
+  }
+
+
+  public void testUserNum_20() {
+    //ZipfGenerator generator0 = new ZipfGenerator(1023, 0.3);
+    // ZipfGenerator generator1 = new ZipfGenerator(512, 0.3);
+    //ZipfGenerator generator2 = new ZipfGenerator(256, 0.3);
+    mTestFileLength *= 2;
+    cacheSize *= 2;
+    ZipfGenerator userGenerator = new ZipfGenerator(20, 0.8);
+    for (int i = 0; i < 1; i ++) {
+      System.out.println("==================================================");
+      for (int j = 0; j < 3000; j ++) {
+        int tmp;
+        if (j %3 == 0) {
+          evictCheck();
+        }
+        int randomIndex = (20 - userGenerator.next());
+        tmp = RandomUtils.nextInt(0, (20 - randomIndex) * 100);
+
+
+        long userId = randomIndex;
+        long begin = 1024 * 1024 * tmp;
+        long end = begin + 1024 * 1024;
+        TmpCacheUnit unit = new TmpCacheUnit(1, begin, end);
+        access(userId, unit);
+      }
+
+      System.out.println("all : " + (double) mHitSize / (double) mAccessSize);
+
+      System.out.println("actual : ");
+      for (long userId1 : actualEvictContext.keySet()) {
+        System.out.println(userId1 + " : " + actualEvictContext.get(userId1).computePartialHitRatio());
+      }
+    }
+  }
+
+
 
   private void evictCheck() {
    // double before = mEvictRatio;
@@ -409,6 +443,6 @@ public class MTLRUEvictor extends LRUEvictor {
 
   public static void main(String [] args) {
     MTLRUEvictor mtlruTest = new MTLRUEvictor(new ClientCacheContext(false));
-    mtlruTest.test();
+    mtlruTest.testUserNum_5();
   }
 }

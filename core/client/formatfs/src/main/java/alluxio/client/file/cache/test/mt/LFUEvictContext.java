@@ -105,8 +105,11 @@ public class LFUEvictContext extends BaseEvictContext {
           }
         }
         double saveRatio = 1 - proSum / shareNum;
+        //System.out.println(saveRatio);
         double RandomTmp = RandomUtils.nextDouble(0,1);
         if (RandomTmp > saveRatio) {
+         // System.out.println(saveRatio + " " + RandomTmp);
+
           return tmp;
         }
       } else {

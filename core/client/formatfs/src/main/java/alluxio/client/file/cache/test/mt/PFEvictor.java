@@ -81,7 +81,7 @@ public class PFEvictor extends MTLRUEvictor {
       long maxCostId = -1;
       //System.out.println("============");
       for (long userId : actualEvictContext.keySet()) {
-        double tmpCost =  computePFValueWhenCheat(userId);
+        double tmpCost =  computePFValue(userId);
         if (tmpCost > maxValue ) {
           maxValue = tmpCost;
           maxCostId = userId;
@@ -96,7 +96,6 @@ public class PFEvictor extends MTLRUEvictor {
 
   public static void main(String[] args) {
     PFEvictor test = new PFEvictor(new ClientCacheContext(false));
-    test.testCheatAccess();
+    test.testUserNum_3();
   }
-
 }
