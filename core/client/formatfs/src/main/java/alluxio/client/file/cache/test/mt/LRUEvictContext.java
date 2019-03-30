@@ -4,11 +4,9 @@ import alluxio.client.file.cache.CacheInternalUnit;
 import alluxio.client.file.cache.CacheUnit;
 import alluxio.client.file.cache.ClientCacheContext;
 import alluxio.client.file.cache.TempCacheUnit;
+import org.apache.commons.lang3.RandomUtils;
 
-import java.util.HashSet;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 
 public class LRUEvictContext extends BaseEvictContext {
   LinkedList<TmpCacheUnit> mLRUList = new LinkedList<>();
@@ -76,6 +74,54 @@ public class LRUEvictContext extends BaseEvictContext {
   public TmpCacheUnit getMaxPriorityUnit() {
     return mLRUList.peekLast();
   }
+
+  public TmpCacheUnit getSharedEvictUnit() {
+    Iterator<TmpCacheUnit> iterator  = mLRUList.iterator();
+    double proSum = 0;
+    double shareNum = 0;
+    while (iterator.hasNext()) {
+      TmpCacheUnit tmp = iterator.next();
+      Set<Long> s = mtlruEvictor.mShareSet.get(tmp);
+      if (s.size() > 1) {
+        for (long l : s) {
+          if (l != mUserId) {
+            double pro = mtlruEvictor.actualEvictContext.get(l).getEvictProbability(tmp);
+            proSum += pro;
+
+            shareNum ++;
+          }
+        }
+        double saveRatio = 1 - proSum / shareNum;
+        //System.out.println("sac "+ saveRatio);
+
+        double RandomTmp = RandomUtils.nextDouble(0,1);
+        if (RandomTmp > saveRatio) {
+          return tmp;
+        }
+      } else {
+
+        return tmp;
+      }
+
+    }
+    return getEvictUnit();
+  }
+
+  public double getEvictProbability(TmpCacheUnit unit) {
+    if (!accessSet.contains(unit)) {
+      return 0;
+    }
+    int size = accessSet.size();
+    double interval = (double)size / (double)10;
+    for (int i = 0 ;i < mLRUList.size(); i ++) {
+      if(mLRUList.get(i).equals(unit)) {
+
+        return 1 - (double)((int)(i / interval)) /(double) 10;
+      }
+    }
+    return 0;
+  }
+
 
 }
 

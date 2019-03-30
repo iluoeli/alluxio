@@ -1,6 +1,7 @@
 package alluxio.client.file.cache.test.mt;
 
 import alluxio.client.file.cache.ClientCacheContext;
+import org.apache.commons.lang3.RandomUtils;
 
 import java.util.*;
 
@@ -88,6 +89,16 @@ public class LIRSEvictContext extends BaseEvictContext {
       TmpCacheUnit deleteUnit = getEvictUnit();
       mCacheSize -= remove(deleteUnit);
     }
+  }
+
+  public TmpCacheUnit getSharedEvictUnit() {
+    throw new RuntimeException("unsupport");
+  //  return getEvictUnit();
+  }
+
+  public double getEvictProbability(TmpCacheUnit unit) {
+    throw new RuntimeException("unsupport");
+
   }
 
   @Override

@@ -208,4 +208,8 @@ public abstract class BaseEvictContext {
     fakeAccess(unit);
     return cheatAccess0(unit);
   }
+
+  public abstract TmpCacheUnit getSharedEvictUnit();
+
+  public abstract double getEvictProbability(TmpCacheUnit unit);
 }

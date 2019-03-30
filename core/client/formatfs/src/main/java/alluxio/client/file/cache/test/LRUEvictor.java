@@ -12,10 +12,12 @@ public class LRUEvictor {
   public ClientCacheContext mContext;
   private Map<CacheInternalUnit, Set<BaseCacheUnit>> mAccessMap = new HashMap<>();
   public long mTestFileId = 1;
-  public long mTestFileLength = 1024 * 1024 * 1024;
+  //cheat test set to 100 the cache evictor need to set to LRU
+  public long mTestFileLength = 1024 * 1024 * 100;
   protected Set<BaseCacheUnit> visitList = new HashSet<>();
   public UnlockTask unlockTask = new UnlockTask();
-  public long cacheSize = 1024 * 1024 * 300;
+  //cheat test set to 100
+  public long cacheSize = 1024 * 1024 * 100;
 
   public LRUEvictor(ClientCacheContext context) {
     mContext = context;

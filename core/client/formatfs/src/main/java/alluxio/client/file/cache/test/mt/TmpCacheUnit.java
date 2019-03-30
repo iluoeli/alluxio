@@ -5,11 +5,12 @@ import io.netty.buffer.ByteBuf;
 import java.io.IOException;
 import java.util.List;
 
-public class TmpCacheUnit  {
+public class TmpCacheUnit implements Comparable  {
   private long mBegin, mEnd, mFileId;
   public long mClientIndex;
   public double mCost =0;
   private int mAccessTime = 0;
+  private int mAccessInterval = 0;
 
   public int getmAccessTime() {
     return mAccessTime;
@@ -18,6 +19,13 @@ public class TmpCacheUnit  {
   public TmpCacheUnit setmAccessTime(int mAccessTime) {
     this.mAccessTime = mAccessTime;
     return this;
+  }
+
+  public int getmAccessInterval() {
+    return mAccessInterval;
+  }
+  public void setmAccessInterval(int i ) {
+    mAccessInterval = i;
   }
 
   public TmpCacheUnit(long fileId, long begin, long end) {
@@ -54,7 +62,7 @@ public class TmpCacheUnit  {
   @Override
   public String toString() {
     return "empty unit begin: " + mBegin + "end: " + mEnd
-            + " file id :" + mFileId;
+            + " file id :" + mFileId + " access time " + mAccessTime + " accessInterval " + mAccessInterval;
   }
 
 
@@ -77,5 +85,15 @@ public class TmpCacheUnit  {
       return this.getFileId() == tobj.getFileId() && this.mBegin == tobj.getBegin() && this.mEnd == tobj.getEnd();
     }
     return false;
+  }
+
+  @Override
+  public int compareTo(Object o) {
+    TmpCacheUnit u = (TmpCacheUnit)o;
+    if (u.mAccessTime != mAccessTime) {
+      return mAccessTime - u.mAccessTime;
+    } else {
+      return mAccessInterval - u.getmAccessInterval();
+    }
   }
 }

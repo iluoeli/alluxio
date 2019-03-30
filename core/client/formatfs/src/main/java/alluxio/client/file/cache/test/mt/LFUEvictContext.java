@@ -2,31 +2,31 @@ package alluxio.client.file.cache.test.mt;
 
 import alluxio.client.file.cache.ClientCacheContext;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.Lists;
+import org.apache.commons.lang3.RandomUtils;
 
 import java.util.*;
 
 public class LFUEvictContext extends BaseEvictContext {
   public PriorityQueue<TmpCacheUnit> mVisitQueue;
   Map<TmpCacheUnit, Integer> mAccessMap = new HashMap<>();
+  private int time = 0;
+  private ArrayList<TmpCacheUnit> tmpSortList;
 
   public LFUEvictContext(MTLRUEvictor test, ClientCacheContext cacheContext, long userId) {
     super(test, cacheContext, userId);
-    mVisitQueue = new PriorityQueue<>(new Comparator<TmpCacheUnit>() {
-      @Override
-      public int compare(TmpCacheUnit o1, TmpCacheUnit o2) {
-        return o1.getmAccessTime() - o2.getmAccessTime();
-      }
-    });
+    mVisitQueue = new PriorityQueue<>();
   }
 
   public void fakeAccess(TmpCacheUnit unit) {
+    unit.setmAccessInterval(++ time);
    // check();
     if (mAccessMap.containsKey(unit)) {
       mVisitQueue.remove(unit);
       mVisitQueue.add(unit.setmAccessTime(mAccessMap.get(unit) +1));
     }
     else {
-      mVisitQueue.add(unit.setmAccessTime(1));
+      mVisitQueue.add(unit.getmAccessInterval()!= 0? unit : unit.setmAccessTime(1));
     }
     mAccessMap.put(unit, mAccessMap.getOrDefault(mAccessMap.get(unit), 1));
   }
@@ -78,6 +78,66 @@ public class LFUEvictContext extends BaseEvictContext {
     if (mAccessMap.containsKey(deleteUnit)) {
       mAccessMap.remove(deleteUnit);
       mVisitQueue.remove(deleteUnit);
+    }
+  }
+
+  public void sort() {
+    tmpSortList = new ArrayList<>(mVisitQueue);
+    Collections.sort(tmpSortList);
+  }
+
+  public TmpCacheUnit getSharedEvictUnit() {
+    double proSum = 0;
+    double shareNum = 0;
+
+    sort();
+    Preconditions.checkArgument(tmpSortList != null);
+    Iterator<TmpCacheUnit> iterator = tmpSortList.iterator();
+    while (iterator.hasNext()) {
+      TmpCacheUnit tmp = iterator.next();
+      Set<Long> s = mtlruEvictor.mShareSet.get(tmp);
+      if (s.size() > 1) {
+        for (long l : s) {
+          if (l != mUserId) {
+            double pro = mtlruEvictor.actualEvictContext.get(l).getEvictProbability(tmp);
+            proSum += pro;
+            shareNum ++;
+          }
+        }
+        double saveRatio = 1 - proSum / shareNum;
+        double RandomTmp = RandomUtils.nextDouble(0,1);
+        if (RandomTmp > saveRatio) {
+          return tmp;
+        }
+      } else {
+      return tmp;
+    }
+
+    }
+    return getEvictUnit();
+  }
+
+  public double getEvictProbability(TmpCacheUnit unit) {
+    if (!mAccessMap.containsKey(unit)) {
+      return 0;
+    }
+    int size = mAccessMap.size();
+    double interval = (double)size / (double)10;
+    if (tmpSortList == null) {
+      sort();
+    }
+    for (int i = 0 ;i <tmpSortList.size(); i ++) {
+      if(tmpSortList.get(i).equals(unit)) {
+        return 1 - (double)((int)(i / interval)) /(double) 10;
+      }
+    }
+    return 0;
+  }
+
+  public void print() {
+    sort();
+    for (TmpCacheUnit unit :tmpSortList) {
+      System.out.println(unit);
     }
   }
 }

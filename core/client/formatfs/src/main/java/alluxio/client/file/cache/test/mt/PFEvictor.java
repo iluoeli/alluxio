@@ -96,7 +96,7 @@ public class PFEvictor extends MTLRUEvictor {
 
   public static void main(String[] args) {
     PFEvictor test = new PFEvictor(new ClientCacheContext(false));
-    test.test();
+    test.testCheatAccess();
   }
 
 }

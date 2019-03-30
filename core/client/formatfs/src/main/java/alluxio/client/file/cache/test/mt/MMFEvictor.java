@@ -51,7 +51,9 @@ public class MMFEvictor extends MTLRUEvictor {
           maxSize = usedSize;
           maxUserId = userId;
         }
+        // System.out.println("size test " + userId + " : " + usedSize / (1024 *1024) );
       }
+      // System.out.println("evict " + maxUserId);
       TmpCacheUnit unit = actualEvictContext.get(maxUserId).getEvictUnit();
       actualSize -= actualEvictContext.get(maxUserId).remove(unit);
       checkRemoveByShare(unit, maxUserId);
@@ -60,6 +62,6 @@ public class MMFEvictor extends MTLRUEvictor {
 
   public static void main(String[] args) {
     MMFEvictor test = new MMFEvictor(new ClientCacheContext(false));
-    test.test();
+    test.testCheatAccess();
   }
 }
