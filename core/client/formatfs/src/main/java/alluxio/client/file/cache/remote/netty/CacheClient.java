@@ -54,7 +54,9 @@ public final class CacheClient {
     while ((read = in.read(tmp, 0, 1024 * 1024) )!= -1) {
       sum += read;
     }
-    Preconditions.checkArgument(sum == 20 * 1024 * 1024);
+    Preconditions.checkArgument(sum == 10 * 1024 * 1024);
+    System.out.println("=============client finish=======");
+
   }
 
 
@@ -75,7 +77,7 @@ public final class CacheClient {
   private InetAddress getServerAddress() {
     InetAddress address;
     try {
-      address = InetAddress.getLocalHost();
+      address = InetAddress.getByName("simple25");
     } catch (UnknownHostException e) {
       throw new RuntimeException(e);
     }    // return new DomainSocketAddress("/tmp/domain");
@@ -156,7 +158,7 @@ public final class CacheClient {
     FileCacheContext.INSTANCE.addLocalFileCache("/dev/shm/test", in);
     File f = new File("/dev/shm/test");
     */
-    MappedCacheEntity entity = new MappedCacheEntity(1, "/dev/shm/test", 20  *1024 * 1024);
+    MappedCacheEntity entity = new MappedCacheEntity(1, "/dev/shm/test", 10  *1024 * 1024);
     FileCacheContext.INSTANCE.addCache(1, entity);
     CacheFileInputStream in1 = new CacheFileInputStream(1);
     int tmp = 0;
@@ -166,13 +168,14 @@ public final class CacheClient {
       read += tmp;
       System.out.println(tmp);
     }
-    Preconditions.checkArgument(read == 20 * 1024 * 1024);
+    in1.close();
+    //Preconditions.checkArgument(read == 10 * 1024 * 1024);
 
   }
 
   public static void main(String[] arg) throws Exception{
     CacheClient cacheClient = new CacheClient();
-    cacheClient.writeIntoRamFsTest();
+     cacheClient.testRead();
     System.out.println("===============finish===============");
   }
 }

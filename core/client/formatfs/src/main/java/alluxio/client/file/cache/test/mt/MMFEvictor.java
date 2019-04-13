@@ -62,5 +62,6 @@ public class MMFEvictor extends MTLRUEvictor {
   public static void main(String[] args) {
     MMFEvictor test = new MMFEvictor(new ClientCacheContext(false));
     test.testUserNum_5();
+    //ExcelTest.generateFile();
   }
 }

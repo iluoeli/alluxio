@@ -57,7 +57,7 @@ public class ClientCacheContext implements CacheContext {
     return GhostCache.INSTANCE;
   }
 
-  public ExecutorService COMPUTE_POOL = Executors.newFixedThreadPool(4);
+  public ExecutorService COMPUTE_POOL = Executors.newFixedThreadPool(10);
   private static final MetedataCache metedataCache;
   public static long checkout = 0;
   public static long missSize;

@@ -97,6 +97,7 @@ public class LFUEvictContext extends BaseEvictContext {
       TmpCacheUnit tmp = iterator.next();
       Set<Long> s = mtlruEvictor.mShareSet.get(tmp);
       if (s.size() > 1) {
+
         for (long l : s) {
           if (l != mUserId) {
             double pro = mtlruEvictor.actualEvictContext.get(l).getEvictProbability(tmp);
@@ -137,10 +138,19 @@ public class LFUEvictContext extends BaseEvictContext {
     return 0;
   }
 
+
   public void print() {
     sort();
+    System.out.println("============begin===========");
+    System.out.println("print info " + mUserId);
+    Map<Long, Integer> tmp = new HashMap<>();
+
     for (TmpCacheUnit unit :tmpSortList) {
-      System.out.println(unit);
+      tmp.put(unit.getFileId(), tmp.getOrDefault(unit.getFileId(), 0) + 1);
     }
+    for (long l : tmp.keySet()) {
+      System.out.println("user id " + l + " " + tmp.get(l));
+    }
+    System.out.println("============finish===========");
   }
 }

@@ -19,6 +19,7 @@ public class LRUEvictor {
   //cheat test set to 100
   public long cacheSize = 1024 * 1024 * 300;
 
+
   public LRUEvictor(ClientCacheContext context) {
     mContext = context;
   }

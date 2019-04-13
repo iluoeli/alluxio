@@ -182,6 +182,10 @@ public abstract class BaseEvictContext {
     return remove0(unit, isActual);
   }
 
+  public void print() {
+
+  }
+
   public long remove(TmpCacheUnit unit) {
     return remove(unit, true);
   }
@@ -206,4 +210,5 @@ public abstract class BaseEvictContext {
   public abstract TmpCacheUnit getSharedEvictUnit();
 
   public abstract double getEvictProbability(TmpCacheUnit unit);
+
 }

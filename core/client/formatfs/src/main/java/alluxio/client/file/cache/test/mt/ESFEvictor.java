@@ -57,7 +57,8 @@ public class ESFEvictor extends MTLRUEvictor {
     double hitRatio =(actualEvictContext.get(userId).computePartialHitRatio() / baseEvictCotext.get(userId).computePartialHitRatio());
     double lowestRatio =  1 / (double)actualEvictContext.size();
     //System.out.println("test " + usedRatio + " : " + hitRatio + " : " + lowestRatio);
-    return usedRatio >= lowestRatio && hitRatio >= lowestRatio;
+    return usedRatio >= lowestRatio ;
+            //&& hitRatio >= lowestRatio;
   }
 
   private long getMostUsedCache() {
@@ -104,7 +105,7 @@ public class ESFEvictor extends MTLRUEvictor {
        // System.out.println(userId + " cache size " +(actualEvictContext.get(userId).mCacheSize) / (1024 * 1024) + " || " + cacheSize/ ( 1024 * 1024));
         if (HRDCost < minHRDCost && actualEvictContext.get(userId).mCacheSize > 0
                 && actualEvictContext.get(userId).getEvictUnit()!= null
-              // && isIsolateGanaratee(userId)
+           //   && isIsolateGanaratee(userId)
                 ){
           minHRDCost = HRDCost;
           minCostUserId = userId;
@@ -118,6 +119,7 @@ public class ESFEvictor extends MTLRUEvictor {
       }
 
       TmpCacheUnit unit = actualEvictContext.get(minCostUserId).getSharedEvictUnit();
+     // System.out.println(unit.getFileId());
       actualSize -=  actualEvictContext.get(minCostUserId).remove(unit);
       checkRemoveByShare(unit, minCostUserId);
     }
@@ -125,6 +127,8 @@ public class ESFEvictor extends MTLRUEvictor {
 
   public static void main(String [] args) {
     ESFEvictor esfTest = new ESFEvictor(new ClientCacheContext(false));
-    esfTest.testUserNum_3();
+    esfTest.testUserNum_5();
+    //ExcelTest.generateFile();
+
   }
 }

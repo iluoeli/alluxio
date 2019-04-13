@@ -8,7 +8,7 @@ public class FairrideEvictor extends MMFEvictor {
   public FairrideEvictor(ClientCacheContext context) {
     super(context);
   }
-  /*
+
   @Override
   public void access(long userId, TmpCacheUnit unit) {
     if (mShareSet.containsKey(unit)) {
@@ -23,17 +23,17 @@ public class FairrideEvictor extends MMFEvictor {
       }
     }
     super.access(userId, unit);
-  }*/
+  }
 
   @Override
   public void cheatAccess(TmpCacheUnit unit, long userId) {
-    System.out.println("cheat access =============== ");
+    //System.out.println("cheat access =============== ");
 
-    return;
-    /*
+    //return;
+
     if (mShareSet.containsKey(unit)) {
       //if(!( mShareSet.size() == 1)) {
-        int shareSize = mShareSet.get(unit).size();
+        int shareSize = mShareSet.get(unit).size() + 1;
         double random = 1 / (double) shareSize;
         double pro = RandomUtils.nextDouble(0, 1);
         if (pro < random) {
@@ -43,18 +43,20 @@ public class FairrideEvictor extends MMFEvictor {
         }
      // }
     }
-    long actualNew = actualEvictContext.get(userId).cheatAccess(unit);
+    long actualNew = actualEvictContext.get(userId).access(unit);
     if (actualNew > 0) {
       actualSize += actualNew;
       while (actualSize > cacheSize) {
         evict();
       }
-    }*/
+    }
   }
 
 
   public static void main(String[] args) {
     FairrideEvictor test = new FairrideEvictor(new ClientCacheContext(false));
     test.testCheatAccess();
+    ExcelTest.generateFile();
+
   }
 }

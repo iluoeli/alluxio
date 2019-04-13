@@ -28,6 +28,7 @@ import alluxio.wire.WorkerNetAddress;
 import alluxio.worker.block.io.LocalFileBlockReader;
 
 import com.google.common.base.Preconditions;
+import com.sun.xml.internal.ws.api.policy.PolicyResolver;
 import io.netty.channel.Channel;
 
 import java.io.IOException;
@@ -139,6 +140,7 @@ public final class LocalFilePacketReader implements PacketReader {
         rpcTime.put(Thread.currentThread().getId(), rpcTime.getOrDefault(Thread.currentThread()
           .getId(),0l) + (System.currentTimeMillis() - begin));
         mPath = message.asLocalBlockOpenResponse().getPath();
+        context.mBlockIdToPathMap.put(mBlockId, mPath);
       } catch (Exception e) {
         context.releaseNettyChannel(address, mChannel);
         throw e;

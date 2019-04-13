@@ -122,6 +122,14 @@ public class LRUEvictContext extends BaseEvictContext {
     return 0;
   }
 
+  public void print() {
+    System.out.println("print info " + mUserId);
+    for (TmpCacheUnit unit : mLRUList) {
+      System.out.println(unit);
+    }
+    System.out.println("size : " + mLRUList.size());
+  }
+
 
 }
 

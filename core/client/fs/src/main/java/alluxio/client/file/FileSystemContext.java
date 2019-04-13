@@ -96,6 +96,7 @@ public final class FileSystemContext implements Closeable {
   private ExecutorService mExecutorService;
   private MetricsMasterClient mMetricsMasterClient;
   private ClientMasterSync mClientMasterSync;
+  public static Map<Long,String> mBlockIdToPathMap = new HashMap<>();
 
   private final String mAppId;
   @GuardedBy("CONTEXT_CACHE_LOCK")

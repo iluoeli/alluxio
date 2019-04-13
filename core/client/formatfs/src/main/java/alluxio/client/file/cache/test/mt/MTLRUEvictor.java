@@ -24,6 +24,8 @@ public class MTLRUEvictor extends LRUEvictor {
   private int userNum = 3;
   public long mShareVisitSize = 0;
   public BaseEvictContext mBaseEvictContext = new LRUEvictContext(this, new ClientCacheContext(false), -1);
+  public ClientCacheContext mComputeContext = new ClientCacheContext(false);
+
 
   public static Map<Long, Generator> userMap = new HashMap<>();
   public Map<TmpCacheUnit, Set<Long>> mShareSet = new HashMap<>();
@@ -46,6 +48,14 @@ public class MTLRUEvictor extends LRUEvictor {
   public MTLRUEvictor(ClientCacheContext context) {
     super(context);
 
+  }
+
+  public void accessByCount(TmpCacheUnit unit) {
+    CacheUnit unit1 = mComputeContext.getCache(unit.getFileId(), mTestFileLength, unit.getBegin(), unit.getEnd(), new UnlockTask());
+    if (!unit1.isFinish()) {
+      TempCacheUnit unit2 = (TempCacheUnit) unit1;
+      mComputeContext.addCache(unit2);
+    }
   }
 
 
@@ -121,17 +131,58 @@ public class MTLRUEvictor extends LRUEvictor {
     }
   }
 
-  public void testCheatAccess() {
-    for (int j = 0; j < 500; j ++) {
-      if (j % 100 ==0) {
-        for (long userId1 : actualEvictContext.keySet()) {
-          actualEvictContext.get(userId1).initAccessRecord();
-        }
-        for (long userId1 : baseEvictCotext.keySet()) {
-          baseEvictCotext.get(userId1).initAccessRecord();
-        }
-        mHitSize = mAccessSize = 1;
+  public void testAccess0(int j) {
+    int userId = RandomUtils.nextInt(0, 2);
+    int tmp;
+
+    tmp = RandomUtils.nextInt(0, 99);
+    long fileId;
+    if (userId == 0) {
+      int accessShare = RandomUtils.nextInt(0,8);
+      if (accessShare != 0) {
+        fileId = 1;
+      } else {
+        fileId = 2;
       }
+      if (j > 400) {
+        if (accessShare != 0) {
+          fileId = 2;
+        } else {
+          fileId = 1;
+        }
+      }
+    }
+    else  {
+      int accessShare = RandomUtils.nextInt(0, 8);
+      if (accessShare == 0) {
+        fileId = 1;
+      } else {
+        fileId = 2;
+      }
+
+      if (j > 400) {
+        if (accessShare == 0) {
+          fileId = 2;
+        } else {
+          fileId = 1;
+        }
+      }
+    }
+
+    long begin = 1024 * 1024 * tmp;
+    long end = begin + 1024 * 1024;
+    TmpCacheUnit unit = new TmpCacheUnit(fileId, begin,end);
+    access(userId, unit);
+    checkSize();
+
+  }
+
+
+  public void testCheatAccess() {
+    cacheSize = 1024 * 1024 * 100;
+    mTestFileLength = 1024 * 1024 * 100;
+    for (int j = 0; j < 600; j ++) {
+
       if (j % 3 == 0) {
         evictCheck();
       }
@@ -144,7 +195,7 @@ public class MTLRUEvictor extends LRUEvictor {
       if (userId ==0) {
         int accessShare = RandomUtils.nextInt(0,5);
         if (accessShare != 0) {
-         fileId = 1;
+          fileId = 1;
         } else {
           fileId = 2;
         }
@@ -172,7 +223,6 @@ public class MTLRUEvictor extends LRUEvictor {
         }
       }
 
-
       long begin = 1024 * 1024 * tmp;
       long end = begin + 1024 * 1024;
       TmpCacheUnit unit = new TmpCacheUnit(fileId, begin,end);
@@ -181,34 +231,63 @@ public class MTLRUEvictor extends LRUEvictor {
 
       if (j % 10 == 0) {
         System.out.println(j + " actual : ");
+        double[] tmpArr = new double[3];
+        int index = 0;
         for (long userId1 : actualEvictContext.keySet()) {
           System.out.println(userId1 + " : " + actualEvictContext.get(userId1).computePartialHitRatio());
+          tmpArr[index ++] = actualEvictContext.get(userId1).computePartialHitRatio();
         }
         //System.out.println(j + " base : ");
        // for (long userId1 : baseEvictCotext.keySet()) {
        //   System.out.println(userId1 + " : " + baseEvictCotext.get(userId1).computePartialHitRatio());
        // }
         System.out.println("global : " + (double) mHitSize / (double) mAccessSize);
+        tmpArr[index ++] =  (double) mHitSize / (double) mAccessSize;
+        ExcelTest.addnew(j , tmpArr[0], tmpArr[1],tmpArr[2]);
       }
 
-      if (j == 400) {
-        //user 1 cheat;
-        for (int i = 0; i < 100; i ++) {
-          tmp = RandomUtils.nextInt(0, 99);
-          begin = 1024 * 1024 * tmp;
-          end = begin + 1024 * 1024;
-          TmpCacheUnit un = new TmpCacheUnit(1, begin, end);
-          un.setmAccessTime(10);
-          cheatAccess(un, 1);
+
+
+
+        if (j % 100 == 0 && j <=400) {
+          for (long userId1 : actualEvictContext.keySet()) {
+            actualEvictContext.get(userId1).initAccessRecord();
+          }
+          for (long userId1 : baseEvictCotext.keySet()) {
+            baseEvictCotext.get(userId1).initAccessRecord();
+          }
+          mHitSize = mAccessSize = 1;
+
+          if (j == 400) {
+          for (int i = 0; i < 10; i++) {
+            tmp = RandomUtils.nextInt(0, 99);
+            begin = 1024 * 1024 * tmp;
+            end = begin + 1024 * 1024;
+
+            cheatAccess(new TmpCacheUnit(2, begin, end), 1);
+            cheatAccess(new TmpCacheUnit(2, begin, end), 0);
+          }
+          System.out.println("cheat begin");
+          for (int i = 0; i < 100; i++) {
+            tmp = RandomUtils.nextInt(0, 99);
+            begin = 1024 * 1024 * tmp;
+            end = begin + 1024 * 1024;
+            TmpCacheUnit un = new TmpCacheUnit(1, begin, end);
+            un.setmAccessTime(2);
+            cheatAccess(un, 1);
+          }
+          System.out.println("cheat end");
+
+
+
+         // for (long i : actualEvictContext.keySet()) {
+          //  actualEvictContext.get(i).print();
+         // }
+
+          for (int i = 0; i < 10; i++) {
+            testAccess0(j + 1);
+          }
         }
-        /*
-        System.out.println("print 0=======================");
-        ((LFUEvictContext)actualEvictContext.get(0L)).print();
-
-        System.out.println("print 1=======================");
-        ((LFUEvictContext)actualEvictContext.get(1L)).print();*/
-
-
       }
     }
   }
@@ -270,15 +349,15 @@ public class MTLRUEvictor extends LRUEvictor {
         int tmp;
         int randomIndex = (5 - userGenerator.next());
         if (randomIndex % 5 == 0) {
-          tmp = RandomUtils.nextInt(0, 1023);
+          tmp = RandomUtils.nextInt(0, 700);
         } else if (randomIndex % 5 == 1) {
-          tmp = RandomUtils.nextInt(0, 800);
+          tmp = RandomUtils.nextInt(0, 650);
         } else if (randomIndex % 5 == 2) {
           tmp = RandomUtils.nextInt(0, 600);
         } else if (randomIndex % 5 == 3) {
-          tmp = RandomUtils.nextInt(0, 400);
+          tmp = RandomUtils.nextInt(0, 550);
         }  else  {
-          tmp = RandomUtils.nextInt(0, 200);
+          tmp = RandomUtils.nextInt(0, 500);
         }
 
         long userId = randomIndex;
@@ -286,6 +365,7 @@ public class MTLRUEvictor extends LRUEvictor {
         long end = begin + 1024 * 1024;
         TmpCacheUnit unit = new TmpCacheUnit(1, begin, end);
         access(userId, unit);
+        accessByCount(unit);
       }
 
       System.out.println("all : " + (double) mHitSize / (double) mAccessSize);
@@ -294,7 +374,27 @@ public class MTLRUEvictor extends LRUEvictor {
       for (long userId1 : actualEvictContext.keySet()) {
         System.out.println(userId1 + " : " + actualEvictContext.get(userId1).computePartialHitRatio());
       }
+      System.out.println("cache ratio :" + (double)cacheSize / (double)mComputeContext.getAllSize(mComputeContext));
+
     }
+    System.out.println(getFairnessIndex());
+    System.out.println("fangcha" + getFangcha());
+  }
+
+  public double getFangcha() {
+    double tmp1 = 700 ;
+    double tmp2 = (double) 650 ;
+    double tmp3 = (double) 600 ;
+    double tmp4 = (double) 550 ;
+    double tmp5 = (double) 500 ;
+
+    double ave = (tmp1 + tmp2 + tmp3 + tmp4 + tmp5) / 5;
+    double res  = (tmp1 - ave) * (tmp1 - ave) +
+            (tmp2 - ave) * (tmp2 - ave) +
+    (tmp3 - ave) * (tmp3 - ave) +
+    (tmp4 - ave) * (tmp4 - ave) +
+    (tmp5 - ave) * (tmp5 - ave);
+    return Math.sqrt(res / 5);
   }
 
   public void testUserNum_10() {

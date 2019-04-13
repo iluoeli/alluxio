@@ -2,6 +2,7 @@ package alluxio.client.file.cache.remote.netty;
 
 import alluxio.client.file.cache.remote.FileCacheContext;
 import alluxio.client.file.cache.remote.FileCacheEntity;
+import alluxio.client.file.cache.remote.MappedCacheEntity;
 import alluxio.client.file.cache.remote.netty.message.RPCMessage;
 import alluxio.client.file.cache.remote.netty.message.RemoteReadFinishResponse;
 import alluxio.client.file.cache.remote.netty.message.RemoteReadRequest;
@@ -19,6 +20,8 @@ import io.netty.channel.unix.DomainSocketAddress;
 import io.netty.channel.unix.DomainSocketChannel;
 import org.apache.commons.lang3.RandomUtils;
 
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
 import java.net.SocketAddress;
 import java.util.ArrayList;
 import java.util.List;
@@ -180,20 +183,12 @@ public class CacheServer {
   }
 
 
-  public static void addCache() {
+  public static void addCache() throws IOException {
     long fileId = 1;
-    List<ByteBuf> tmp = new ArrayList<>();
-    long length = 0;
-    while (length < 20 * 1024 * 1024) {
-      long tmp1 = RandomUtils.nextLong( 1024 * 1024, 5 * 1024 * 1024);
-      ByteBuf buf = ByteBufAllocator.DEFAULT.buffer((int)tmp1);
-      for (int i = 0 ; i < buf.capacity(); i ++) {
-        buf.writeByte(i);
-      }
-      length += tmp1;
-      tmp.add(buf);
-    }
-    FileCacheEntity entity = new FileCacheEntity(0, 20 * 1024 * 1024, tmp);
+    byte[] b = new byte[10 * 1024 * 1024];
+    FileCacheContext.INSTANCE.addLocalFileCache("/dev/shm/tmp", new ByteArrayInputStream(b));
+
+    MappedCacheEntity entity = new MappedCacheEntity(0, "/dev/shm/tmp", 10 * 1024 * 1024);
     FileCacheContext.INSTANCE.addCache(fileId, entity);
   }
 

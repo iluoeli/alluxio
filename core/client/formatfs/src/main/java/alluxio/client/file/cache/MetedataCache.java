@@ -11,8 +11,12 @@ import alluxio.exception.AlluxioException;
 import alluxio.exception.status.AlluxioStatusException;
 import alluxio.exception.status.NotFoundException;
 import alluxio.exception.status.UnavailableException;
+import alluxio.network.netty.NettyRPC;
+import alluxio.network.netty.NettyRPCContext;
 import alluxio.network.protocol.databuffer.DataBuffer;
 
+import alluxio.util.proto.ProtoMessage;
+import com.google.common.base.Preconditions;
 import com.google.common.collect.BiMap;
 import com.google.common.collect.HashBiMap;
 
@@ -29,6 +33,16 @@ public final class MetedataCache {
   public static Map<FileInStream, Map<Long, BlockInStream>> mBlockStreamCache = new HashMap<>();
   public HashMap<Long, Map<Long, DataBuffer>> tmpCache = new HashMap<>();
   private Map<Long, Long> mFileIDToLengthMap = new HashMap<>();
+  private Map<Long,String> mBlockIdToPathMap = new HashMap<>();
+
+
+  public String getPath(long id) {
+    if (!mBlockIdToPathMap.containsKey(id)) {
+      mBlockIdToPathMap.put(id, FileSystemContext.mBlockIdToPathMap.get(id));
+
+    }
+    return mBlockIdToPathMap.get(id);
+  }
 
   public MetedataCache() {
     //mContext.COMPUTE_POOL.submit(new ExistChecker());
