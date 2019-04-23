@@ -13,7 +13,6 @@ package alluxio.client.block.stream;
 
 import alluxio.Configuration;
 import alluxio.PropertyKey;
-import alluxio.client.file.FileInStream;
 import alluxio.client.file.FileSystemContext;
 import alluxio.client.file.options.InStreamOptions;
 import alluxio.metrics.ClientMetrics;
@@ -28,7 +27,6 @@ import alluxio.wire.WorkerNetAddress;
 import alluxio.worker.block.io.LocalFileBlockReader;
 
 import com.google.common.base.Preconditions;
-import com.sun.xml.internal.ws.api.policy.PolicyResolver;
 import io.netty.channel.Channel;
 
 import java.io.IOException;

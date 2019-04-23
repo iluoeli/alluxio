@@ -44,19 +44,21 @@ public class testRead {
 
   public static AlluxioURI writeToAlluxio(String s, String alluxioName) throws Exception {
     AlluxioURI uri = new AlluxioURI(alluxioName);
-    FileSystem fs =CacheFileSystem.get(true);
+    FileSystem fs =CacheFileSystem.get(false);
     if (fs.exists(uri)) {
       fs.delete(uri);
     }
     FileOutStream out = fs.createFile(uri);
     File f = new File(s);
     byte[] b = new byte[1024 * 1024];
-      BufferedInputStream in = new BufferedInputStream(new FileInputStream(f));
-      int len = 0;
+    for (int i = 0 ;i  <b.length; i ++) {
+      b[i] = (byte)i;
+    }
+
       long readLen = 0;
-      while ((len = in.read(b)) > 0 || readLen < 1024 * 1024 * 1024) {
-        out.write(b, 0, len);
-        readLen += len;
+      while (readLen < 1024 * 1024 * 1024) {
+        out.write(b);
+        readLen += b.length;
       }
 
     out.close();
@@ -464,7 +466,7 @@ public class testRead {
 
 
   public static void main(String[] args) throws Exception {
-    // writeToAlluxio("/usr/local/test.gz", "/testWriteBig");
+    //writeToAlluxio("/usr/local/test.gz", "/testWriteBig");
     // promoteHeapTest();
     //for (int i =0 ; i < 10; i ++) {
     // test();
@@ -473,32 +475,14 @@ public class testRead {
 
     //multiThreadTest();
     for (int i = 0 ;i < 100; i ++) {
-     // promotionTest("/testWriteBig");
+     promotionTest("/testWriteBig");
     }
    // AlluxioMultiRead( "/testWriteBig");
-    List<ByteBuffer> l = mmapTest("/usr/local/test.gz");
-    for (int i = 0 ;i  <10; i ++) {
-      readFromMMap(l);
-    }
-    /*
-mmapTest
-    AlluxioURI uri = new AlluxioURI("/testWriteBig");
-    FileSystem fs = CacheFileSystem.get(false);
-    FileInStream in = fs.openFile(uri);
-     for (int i = 0; i < 100; i++) {
-       byte[] b = new byte[1024 * 1024];
-       FileInStream.initmetric();
-       long begin = System.currentTimeMillis();
-       for (int j = 0 ; j < 1000 ; j ++) {
-         in.positionedRead(10, b, 0, 1024 * 1024);
-       }
-       FileInStream.systemOut();
-       System.out.println("===========" + (System.currentTimeMillis() - begin));
-    //  FileInStream.systemOut();
-    }
-*/
+
+
+
    // multiThreadTest();
-    //FileSystem fs = FileSystem.Factory.get();
+    //FileSystem fs LocalFilePacketReader= FileSystem.Factory.get();
 
 
 

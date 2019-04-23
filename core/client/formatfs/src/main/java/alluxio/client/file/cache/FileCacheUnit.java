@@ -19,10 +19,20 @@ import alluxio.client.file.cache.struct.DoubleLinkedList;
 import alluxio.client.file.cache.struct.LongPair;
 import alluxio.exception.AlluxioException;
 import alluxio.exception.PreconditionMessage;
+import alluxio.util.io.BufferUtils;
 import com.google.common.base.Preconditions;
+import com.sun.prism.shader.Solid_TextureYV12_AlphaTest_Loader;
 import io.netty.buffer.ByteBuf;
+import io.netty.buffer.ByteBufUtil;
+import org.jboss.netty.util.internal.ByteBufferUtil;
 
+import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.RandomAccessFile;
+import java.nio.ByteBuffer;
+import java.nio.MappedByteBuffer;
+import java.nio.channels.FileChannel;
 import java.util.*;
 import java.util.concurrent.LinkedBlockingQueue;
 
@@ -33,7 +43,26 @@ public class FileCacheUnit {
   private boolean use_bucket;
   private final ClientCacheContext.LockManager mLockManager;
   private final ClientCacheContext mContext;
+  private static  FileChannel mChannel;
+  private static int tmp = 0;
 
+  static {
+    try {
+      File f = new File("/dev/shm/tmp");
+      f.createNewFile();
+      RandomAccessFile f1 = new RandomAccessFile(f, "rw");
+      FileChannel channel = f1.getChannel();
+      ByteBuffer b = ByteBuffer.allocate(1024 * 1024 * 10);
+      for (int i = 0; i < b.capacity(); i ++) {
+        b.put((byte)i);
+      }
+      channel.write(b);
+      channel.close();
+      mChannel =  new RandomAccessFile(f, "rw").getChannel();
+    } catch (Exception e) {
+
+    }
+  }
   public FileCacheUnit(long fileId, long length, ClientCacheContext mContext) {
     mFileId = fileId;
     this.mContext = mContext;
@@ -200,9 +229,12 @@ public class FileCacheUnit {
   }
 
   public long merge0(AlluxioURI uri, Queue<LongPair> tmpQueue) throws IOException, AlluxioException {
+    tmp = 0;
+    //ClientCacheContext.INSTANCE.clear();
     LockTask task = new LockTask(mLockManager, mFileId);
     FileSystem fs = CacheFileSystem.get(false);
     FileInStream in = fs.openFile(uri);
+
     //FileInStream in = new FakeFileInStream();
 
     long newSize = 0;
@@ -213,9 +245,9 @@ public class FileCacheUnit {
       long begin = l.getKey();
       in.skip(begin - pos);
       while (curr != null && curr.getEnd() < begin) {
-        task.deleteLock(curr);
+        //task.deleteLock(curr);
         curr = deleteCache(curr);
-        task.deleteUnlock();
+        //task.deleteUnlock();
       }
 
       if (l.getKey() - l.getValue() == 0) continue;
@@ -259,6 +291,7 @@ public class FileCacheUnit {
     task.deleteUnlock();
 
     CacheInternalUnit curr1 = cacheList.head.after;
+    System.out.println("out : ====== "+ tmp);
     return newSize;
 
   }
@@ -441,16 +474,33 @@ public class FileCacheUnit {
       return n;
     }
 
-    @Override
+      @Override
     public int read(byte[] b, int off, int len) throws IOException {
 
-      byte[] tmp = new byte[len];
-      for (int i = off; i < off + len; i ++) {
-        b[i] = tmp[i - off];
-      }
-      tmp = null;
-      pos += len;
-      return len;
+     // byte[] tmp = new byte[len];
+     // for (int i = 0; i < tmp.length; i ++) {
+       // tmp[i] = (byte) i;
+     //
+        tmp ++;
+        int read = 0;
+        int end = Math.min(b.length, off + len);
+        while (len > 0 && off < end) {
+          MappedByteBuffer bb = mChannel.map(FileChannel.MapMode.READ_ONLY, 0, Math.min(len, 32 * 1024));
+          for (int i = 0; i < bb.limit(); i++) {
+           // System.out.println(bb.
+            // position()/ ( 1024) + " " + bb.limit() / (1024 ) + " " + len / 1024);
+            b[off ++] = bb.get();
+            pos ++;
+            read ++;
+          }
+          len -= bb.limit();
+          BufferUtils.cleanDirectBuffer(bb);
+
+          //System.out.println(len / 1024);
+        }
+      //tmp = null;
+
+      return read;
     }
 
   }

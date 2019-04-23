@@ -596,9 +596,7 @@ public class RemoteReadIntegrationTest extends BaseIntegrationTest {
       try {
         is2 = BlockInStream.create(FileSystemContext.get(), options.getBlockInfo(blockId),
             workerAddr, BlockInStreamSource.REMOTE, options);
-      } catch (NotFoundException e) {
-        // Expected since the file has been deleted.
-      } finally {
+      }  finally {
         if (is2 != null) {
           is2.close();
         }

@@ -98,29 +98,6 @@ public class FileInStreamWithCache extends FileInStream {
         unit.setLockTask(task);
         if (unit.isFinish()) {
           ClientCacheContext.allHitTime ++;
-          if (pos < unit.getBegin()) {
-            System.out.println("wrong test ------------");
-            System.out.println(unit);
-            System.out.println(pos + " " + Math.min(pos + len, mLength));
-
-            FileCacheUnit unit1 = mCacheContext.mFileIdToInternalList.get(unit.getFileId());
-            int index = unit1.mBuckets.getIndex(pos, Math.min(pos + len,
-              mLength));
-            System.out.println(index + " | " + unit1.mBuckets.getIndex(unit.getBegin(), unit.getEnd()));
-            LinkedFileBucket.RBTreeBucket bucket =(LinkedFileBucket.RBTreeBucket) unit1.mBuckets.mCacheIndex0[index];
-            System.out.println("start : " + bucket.mStart);
-            System.out.println("end : " + bucket.mEnd);
-            System.out.println(unit1.mBuckets.mBucketLength);
-
-            bucket.mCacheIndex1.print();
-
-            Iterator<CacheInternalUnit> iterator = unit1.getCacheList().iterator();
-            while (iterator.hasNext()) {
-              CacheInternalUnit tmp = iterator.next();
-              System.out.print(tmp.getBegin() + " " + tmp.getEnd() + " || ");
-            }
-            System.out.println();
-          }
 
           Preconditions.checkArgument(pos >= unit.getBegin());
           int remaining = mCachePolicy.read((CacheInternalUnit) unit, b, off, pos, len);

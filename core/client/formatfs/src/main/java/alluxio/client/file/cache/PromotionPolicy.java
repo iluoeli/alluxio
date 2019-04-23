@@ -81,10 +81,8 @@ public class PromotionPolicy implements Runnable {
     synchronized (mAccessLock) {
       if (useOne) {
         mOptimizer.addInputSpace(mInputSpace1);
-        System.out.println(mInputSpace1.size());
       } else {
         mOptimizer.addInputSpace(mInputSpace2);
-        System.out.println(mInputSpace2.size());
 
       }
       useOne = !useOne;
@@ -111,10 +109,8 @@ public class PromotionPolicy implements Runnable {
     synchronized (mAccessLock) {
       if (useOne) {
         mOptimizer.addInputSpace(mInputSpace1);
-        System.out.println(mInputSpace1.size());
       } else {
         mOptimizer.addInputSpace(mInputSpace2);
-        System.out.println(mInputSpace2.size());
 
       }
       useOne = !useOne;
@@ -151,8 +147,8 @@ public class PromotionPolicy implements Runnable {
     mInputSpace2 = new CacheSet();
     setPolicy(CachePolicy.PolicyName.GR);
     mContext.stopCache();
-    //mContext.COMPUTE_POOL.submit(this);
-    mWindowAdaptor = new SlidingWindowAdaptor(this);
+    mContext.COMPUTE_POOL.submit(this);
+    //mWindowAdaptor = new SlidingWindowAdaptor(this);
   }
 
 
@@ -165,7 +161,7 @@ public class PromotionPolicy implements Runnable {
       try {
         if (promoteCheck()) {
           update();
-          mWindowAdaptor.moveWindow();
+         // mWindowAdaptor.moveWindow();
         }
       } catch (Exception e) {
         e.printStackTrace();

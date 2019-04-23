@@ -315,7 +315,6 @@ public class BlockInStream extends InputStream implements BoundedStream, Seekabl
           Preconditions.checkState(dataBuffer.readableBytes() <= len);
           int toRead = dataBuffer.readableBytes();
           long begin = System.currentTimeMillis();
-          System.out.println(dataBuffer.readableBytes());
 
           dataBuffer.readBytes(b, off, toRead);
           mmapTime.put(Thread.currentThread().getId(), mmapTime.getOrDefault(Thread.currentThread()

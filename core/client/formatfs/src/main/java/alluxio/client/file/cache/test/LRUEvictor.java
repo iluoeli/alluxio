@@ -1,8 +1,8 @@
-package alluxio.client.file.cache.test;
+package file.cache.test;
 
-import alluxio.client.file.cache.*;
-import alluxio.client.file.cache.struct.LongPair;
-import alluxio.client.file.cache.submodularLib.cacheSet.CacheSet;
+import file.cache.*;
+import file.cache.struct.LongPair;
+import file.cache.submodularLib.cacheSet.CacheSet;
 import org.apache.commons.lang3.RandomUtils;
 
 import java.util.*;
@@ -18,7 +18,6 @@ public class LRUEvictor {
   public UnlockTask unlockTask = new UnlockTask();
   //cheat test set to 100
   public long cacheSize = 1024 * 1024 * 300;
-
 
   public LRUEvictor(ClientCacheContext context) {
     mContext = context;
@@ -107,8 +106,8 @@ public class LRUEvictor {
   public void init(long limit) throws Exception {
     long sum = 0;
     CacheSet s = new CacheSet();
-    for(int i = 0 ; i < 1024; i ++) {
-      long length = RandomUtils.nextLong(1024 * 1024, 1024 * 1024 * 3);
+    for(int i = 0 ; i < 1200; i ++) {
+      long length = 1024 * 1024;
       long begin = RandomUtils.nextLong(0, 1024 * 1024 * 1024 - length);
       sum += length;
       BaseCacheUnit unit = new BaseCacheUnit(mTestFileId, begin, begin + length);
@@ -119,12 +118,16 @@ public class LRUEvictor {
 
     }
     long size = mContext.getAllSize(s, mContext);
-    while (size > limit) {
-       BaseCacheUnit unit = accessList.getFirst();
-       accessList.removeFirst();
-       size -= delete(unit);
-    }
+    evict(size, limit);
     System.out.println("size : " + mContext.getAllSize(mContext)/(1024 * 1024));
+  }
+
+  public void evict(long size, long limit) {
+    while (size > limit) {
+      BaseCacheUnit unit = accessList.getFirst();
+      accessList.removeFirst();
+      size -= delete(unit);
+    }
   }
 
 
@@ -156,7 +159,7 @@ public class LRUEvictor {
 
   public static void main(String[] args) throws Exception{
     LRUEvictor test = new LRUEvictor(new ClientCacheContext(false));
-    test.init(1024 * 1024 * 100);
+    test.init(1024 * 1024 * 600);
     test.testVisit();
   }
 }

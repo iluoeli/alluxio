@@ -2,6 +2,7 @@ package alluxio.client.file.cache.stream;
 
 import alluxio.Seekable;
 import alluxio.client.block.stream.BlockInStream;
+import alluxio.client.file.FileInStream;
 import alluxio.client.file.cache.ClientCacheContext;
 import alluxio.client.file.cache.MetedataCache;
 import alluxio.exception.PreconditionMessage;
@@ -23,7 +24,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
-public class PartialLocalBlockInStream extends InputStream {
+public class PartialLocalBlockInStream extends FileInStream {
   private List<ByteBuffer> mReadedBuffer = new ArrayList<>();
   private FileChannel mChannel;
   private ClientCacheContext mContext = ClientCacheContext.INSTANCE;

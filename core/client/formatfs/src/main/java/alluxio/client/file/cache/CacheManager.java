@@ -32,12 +32,17 @@ public final class CacheManager {
 
   public int read(TempCacheUnit unit, byte[] b, int off, int readlen, long pos, boolean isAllowCache) throws IOException {
     int res = -1;
+
     long begin = System.currentTimeMillis();
+
     res = unit.lazyRead(b, off, readlen, pos, isAllowCache);
+
     BaseCacheUnit unit1 = new BaseCacheUnit(unit.getFileId(), pos, pos + res);
     unit1.setCurrentHitVal(unit.getNewCacheSize());
     HitMetric.mMissSize += unit.getNewCacheSize();
+
     if (!isPromotion) {
+
       if (isAllowCache) {
         CacheInternalUnit resultUnit = mCacheContext.addCache(unit);
         FileCacheUnit uu = mCacheContext.mFileIdToInternalList.get(unit.getFileId());
@@ -48,17 +53,21 @@ public final class CacheManager {
       } else {
         evictor.fliter(null, unit1);
       }
+
     } else {
+
       promoter.filter(unit1);
     }
     unit.getLockTask().unlockAll();
     testRead.tmpRead += System.currentTimeMillis() - begin;
     HitRatioMetric.INSTANCE.accessSize += readlen;
+
     return res;
   }
 
   public int read(CacheInternalUnit unit, byte[] b, int off, long pos, int len) {
     try {
+
       long begin = System.currentTimeMillis();
 
       int remaining = unit.positionedRead(b, off, pos, len);

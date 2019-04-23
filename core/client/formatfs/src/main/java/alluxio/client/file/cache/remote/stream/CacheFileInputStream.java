@@ -1,5 +1,6 @@
 package alluxio.client.file.cache.remote.stream;
 
+import alluxio.client.file.FileInStream;
 import alluxio.client.file.cache.remote.FileCacheContext;
 import alluxio.client.file.cache.remote.FileCacheEntity;
 import com.google.common.base.Preconditions;
@@ -8,7 +9,7 @@ import io.netty.buffer.ByteBuf;
 import java.io.IOException;
 import java.io.InputStream;
 
-public class CacheFileInputStream extends InputStream {
+public class CacheFileInputStream extends FileInStream {
   private FileCacheContext mCacheContext;
   private FileCacheEntity mData;
   private int mCurrIndex;
@@ -104,7 +105,12 @@ public class CacheFileInputStream extends InputStream {
 
   }
 
-  public int remaining() {
+  public long getPos() {
+    return mPos;
+  }
+
+
+  public long remaining() {
     return (int)mFileLength - mPos;
   }
 }

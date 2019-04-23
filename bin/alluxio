@@ -22,11 +22,10 @@ function printUsage {
   echo -e "  fs            \t Command line tool for interacting with the Alluxio filesystem."
   echo -e "  fsadmin       \t Command line tool for use by Alluxio filesystem admins."
   echo -e "  getConf [key] \t Look up a configuration key, or print all configuration."
-  echo -e "  loadufs       \t Load existing files in underlayer filesystem into Alluxio."
+  echo -e "  job           \t Command line tool for interacting with the job service."
   echo -e "  logLevel      \t Set or get log level of Alluxio servers."
   echo -e "  runClass      \t Run the main method of an Alluxio class."
   echo -e "  runTest       \t Run an end-to-end test on an Alluxio cluster."
-  echo -e "  runKVTest     \t Run a test of key-value store operations."
   echo -e "  runTests      \t Run all end-to-end tests on an Alluxio cluster."
   echo -e "  runJournalCrashTest\t Test the Master Journal System in a crash scenario. Try 'alluxio runJournalCrashTest -help' for more help."
   echo -e "                \t NOTE: This command will stop the existing server and creates a new one!"
@@ -38,8 +37,6 @@ function printUsage {
   echo -e "  copyDir <PATH>\t Copy the PATH to all worker nodes."
   echo -e "  clearCache    \t Clear OS buffer cache of the machine."
   echo -e "  confDocGen    \t Generate configuration docs."
-  echo -e "  thriftGen     \t Generate all thrift code."
-  echo -e "  protoGen      \t Generate all protocol buffer code."
   echo -e "  version       \t Print Alluxio version and exit."
   echo -e "  validateConf  \t Validate Alluxio conf and exit."
   echo -e "  validateEnv   \t Validate Alluxio environment."
@@ -194,7 +191,14 @@ function formatJournal {
 }
 
 function formatMasters {
-  formatJournal "$@"
+  JOURNAL_TYPE=$(${BIN}/alluxio getConf ${ALLUXIO_MASTER_JAVA_OPTS} \
+                       alluxio.master.journal.type | awk '{print toupper($0)}')
+  if [[ ${JOURNAL_TYPE} == "EMBEDDED" ]]; then
+    # Embedded journal is stored on-disk, so format needs to be run on each master
+    ${LAUNCHER} ${BIN}/alluxio-masters.sh ${BIN}/alluxio formatJournal
+  else
+    formatJournal
+  fi
 }
 
 function main {
@@ -235,12 +239,12 @@ function main {
   "format")
     if [[ $# -eq 1 ]]; then
       if [[ $1 == "-s" ]]; then
-        if [[ -e ${ALLUXIO_UNDERFS_ADDRESS} ]]; then
+        if [[ -e ${ALLUXIO_MASTER_MOUNT_TABLE_ROOT_UFS} ]]; then
           # if ufs is local filesystem and already exists
           exit 0
         else
           # if ufs is not set it will default to local filesystem
-          if [[ ! -z ${ALLUXIO_UNDERFS_ADDRESS} ]] && [[ ${ALLUXIO_UNDERFS_ADDRESS} != /* ]] && [[ ${ALLUXIO_UNDERFS_ADDRESS} != file://* ]]; then
+          if [[ ! -z ${ALLUXIO_MASTER_MOUNT_TABLE_ROOT_UFS} ]] && [[ ${ALLUXIO_MASTER_MOUNT_TABLE_ROOT_UFS} != /* ]] && [[ ${ALLUXIO_MASTER_MOUNT_TABLE_ROOT_UFS} != file://* ]]; then
             # if ufs is not local filesystem, don't format
             exit 0
           fi
@@ -294,10 +298,10 @@ function main {
     ALLUXIO_SHELL_JAVA_OPTS+=" -Dalluxio.conf.validation.enabled=false"
     runJavaClass "$@"
   ;;
-  "loadufs")
-    echo "The \"alluxio loadufs <AlluxioURI> <UfsURI>\" command is deprecated since version 1.1." >&2
-    echo "Use the \"alluxio fs mount <AlluxioURI> <UfsURI>\" command followed by the \"alluxio fs ls -R <AlluxioURI>\" command instead." >&2
-    exit 1
+  "job")
+    CLASS="alluxio.cli.job.JobShell"
+    CLASSPATH=${ALLUXIO_CLIENT_CLASSPATH}
+    runJavaClass "$@"
   ;;
   "logLevel")
     CLASS="alluxio.cli.LogLevel"
@@ -313,13 +317,6 @@ function main {
   "runTest")
     CLASS="alluxio.cli.TestRunner"
     CLASSPATH=${ALLUXIO_CLIENT_CLASSPATH}
-    ALLUXIO_SHELL_JAVA_OPTS+=" -Dalluxio.logger.type=Console"
-    runJavaClass "$@"
-  ;;
-  "runKVTest")
-    CLASS="alluxio.examples.keyvalue.KeyValueStoreOperations"
-    CLASSPATH=${ALLUXIO_CLIENT_CLASSPATH}
-    PARAMETER="/default_tests_files/KeyValueStoreOperations"
     ALLUXIO_SHELL_JAVA_OPTS+=" -Dalluxio.logger.type=Console"
     runJavaClass "$@"
   ;;
@@ -370,26 +367,6 @@ function main {
     CLASSPATH=${ALLUXIO_CLIENT_CLASSPATH}
     ALLUXIO_SHELL_JAVA_OPTS+=" -Dalluxio.logger.type=Console"
     runJavaClass "$@"
-  ;;
-  "thriftGen")
-    declare -a thriftSrcPaths=($(find "${BIN}/.." -name "*.thrift" -print0 | xargs -0 -n1 dirname | sort | uniq))
-    for thriftSrcPath in ${thriftSrcPaths[@]}; do
-      rm -rf "${thriftSrcPath}/../main/java/alluxio/thrift"
-      for srcFile in $(ls "${thriftSrcPath}"); do
-        thrift -I "${BIN}/../core/common/src/thrift" --gen java:private-members,generated_annotations=undated -out "${thriftSrcPath}/../main/java/." "${thriftSrcPath}/${srcFile}"
-      done
-    done
-  ;;
-  "protoGen")
-    proto_version="$(protoc --version)"
-    if ! [[ ${proto_version} == *2.5.0* ]]; then
-      echo "protoGen requires protoc version 2.5.0, but <protoc --version> returns <${proto_version}>"
-      exit 1
-    fi
-    rm -rf ${BIN}/../core/protobuf/src/main/java/alluxio/proto
-    for src_file in $(find ${BIN}/../core/protobuf/src/proto -name '*.proto' -type f); do
-      protoc --java_out=${BIN}/../core/protobuf/src/main/java --proto_path=${BIN}/../core/protobuf/src/proto ${src_file}
-    done
   ;;
   "clearCache")
     sync; echo 3 > /proc/sys/vm/drop_caches ;

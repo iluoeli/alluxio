@@ -1207,6 +1207,7 @@
             </goals>
             <configuration>
               <executable>${build.path}/style/check_no_windows_line_endings.sh</executable>
+              <skip>true</skip>
             </configuration>
           </execution>
         </executions>

@@ -211,73 +211,85 @@ public class TempCacheUnit extends LinkNode<TempCacheUnit> implements CacheUnit 
    * Read from file or cache, cache data to cache List
    */
   public int lazyRead(byte[] b, int off, int len, long readPos, boolean isCache) throws IOException {
-    boolean positionedRead = false;
-    if (readPos != in.getPos()) {
-      positionedRead = true;
-    }
-    long pos = readPos;
-    long end = Math.min(mEnd, readPos + len);
-    int leftToRead = (int) (end - readPos);
-    mRealReadSize = leftToRead;
-    int distPos = off;
-    if (hasResource()) {
-      CacheInternalUnit current = getResource();
-      boolean beyondCacheList = false;
-      int readLength = -1;
-      while (pos < end) {
-        //read from cache
-        if (current != null && pos >= current.getBegin()) {
-          readLength = current.positionedRead(b, distPos, pos, leftToRead);
 
-          if (readLength != -1 && !positionedRead) {
-            in.skip(readLength);
+      boolean positionedRead = false;
+      if (readPos != in.getPos()) {
+        positionedRead = true;
+      }
+      long pos = readPos;
+      long end = Math.min(mEnd, readPos + len);
+      int leftToRead = (int) (end - readPos);
+      mRealReadSize = leftToRead;
+      int distPos = off;
+
+      if (hasResource()) {
+
+        CacheInternalUnit current = getResource();
+        boolean beyondCacheList = false;
+        int readLength = -1;
+
+        while (pos < end) {
+          //read from cache
+          if (current != null && pos >= current.getBegin()) {
+            readLength = current.positionedRead(b, distPos, pos, leftToRead);
+
+            if (readLength != -1 && !positionedRead) {
+              in.skip(readLength);
+            }
+            consumeResource(isCache);
+            if (hasResource()) {
+              current = getResource();
+            } else {
+              beyondCacheList = true;
+              current = null;
+            }
           }
-          consumeResource(isCache);
-          if (hasResource()) {
-            current = getResource();
-          } else {
-            beyondCacheList = true;
-            current = null;
+          //read from File, the need byte[] is before the current CacheUnit
+          else {
+            int needreadLen;
+            needreadLen = (int) (end - pos);
+            if (!beyondCacheList) {
+              needreadLen = Math.min((int) (current.getBegin() - pos), needreadLen);
+            }
+            if (!positionedRead) {
+              readLength = ((FileInStreamWithCache) in).innerRead(b, distPos, needreadLen);
+            } else {
+              readLength = ((FileInStreamWithCache) in).innerPositionRead(pos, b, distPos, needreadLen);
+            }
+            if (readLength != -1) {
+              if (isCache) addCache(b, distPos, readLength);
+              mNewCacheSize += readLength;
+            }
           }
-        }
-        //read from File, the need byte[] is before the current CacheUnit
-        else {
-          int needreadLen;
-          needreadLen = (int) (end - pos);
-          if (!beyondCacheList) {
-            needreadLen = Math.min((int) (current.getBegin() - pos), needreadLen);
-          }
-          if (!positionedRead) {
-            readLength = ((FileInStreamWithCache)in).innerRead(b, distPos, needreadLen);
-          } else {
-            readLength = ((FileInStreamWithCache)in).innerPositionRead(pos, b, distPos, needreadLen);
-          }
+          // change read variable
           if (readLength != -1) {
-            if (isCache) addCache(b, distPos, readLength);
-            mNewCacheSize += readLength;
+            pos += readLength;
+            distPos += readLength;
+            leftToRead -= readLength;
           }
         }
-        // change read variable
-        if (readLength != -1) {
-          pos += readLength;
-          distPos += readLength;
-          leftToRead -= readLength;
-        }
-      }
-      return distPos - off;
-    } else {
-      int readLength;
-      if (!positionedRead) {
-        readLength = ((FileInStreamWithCache)in).innerRead(b, off, leftToRead);
+        return distPos - off;
       } else {
-        readLength = ((FileInStreamWithCache)in).innerPositionRead(pos, b, off, leftToRead);
+
+        int readLength;
+        if (!positionedRead) {
+
+          readLength = ((FileInStreamWithCache) in).innerRead(b, off, leftToRead);
+
+        } else {
+
+          readLength = ((FileInStreamWithCache) in).innerPositionRead(pos, b, off, leftToRead);
+
+        }
+
+        if (readLength > 0) {
+          if (isCache) addCache(b, off, readLength);
+          mNewCacheSize += readLength;
+        }
+
+        return readLength;
       }
-      if (readLength > 0) {
-        if (isCache) addCache(b, off, readLength);
-        mNewCacheSize += readLength;
-      }
-      return readLength;
-    }
+
   }
 
   public void addResource(CacheInternalUnit unit) {
