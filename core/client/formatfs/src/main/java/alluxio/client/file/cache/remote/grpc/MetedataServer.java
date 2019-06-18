@@ -1,6 +1,9 @@
 package alluxio.client.file.cache.remote.grpc;
 
-import alluxio.client.file.cache.*;
+import alluxio.client.file.cache.core.CacheUnit;
+import alluxio.client.file.cache.core.ClientCacheContext;
+import alluxio.client.file.cache.core.LockTask;
+import alluxio.client.file.cache.core.TempCacheUnit;
 import alluxio.client.file.cache.remote.grpc.service.*;
 import com.google.common.base.Objects;
 import io.grpc.stub.StreamObserver;

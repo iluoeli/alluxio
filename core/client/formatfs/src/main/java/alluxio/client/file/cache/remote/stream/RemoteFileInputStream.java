@@ -1,28 +1,11 @@
 package alluxio.client.file.cache.remote.stream;
 
-import alluxio.client.file.FileInStream;
-import alluxio.client.file.FileSystemContext;
-import alluxio.client.file.URIStatus;
-import alluxio.client.file.cache.CacheManager;
-import alluxio.client.file.cache.ClientCacheContext;
-import alluxio.client.file.cache.remote.FileCacheContext;
-import alluxio.client.file.cache.remote.FileCacheEntity;
-import alluxio.client.file.cache.remote.netty.CacheClient;
 import alluxio.client.file.cache.remote.netty.message.RemoteReadResponse;
-import alluxio.client.file.options.InStreamOptions;
-import com.google.common.base.Preconditions;
 import io.netty.buffer.ByteBuf;
 
 import java.io.IOException;
-import java.io.InputStream;
-import java.util.Comparator;
-import java.util.LinkedList;
 import java.util.PriorityQueue;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.ReentrantLock;
-
-import static alluxio.client.file.cache.ClientCacheContext.fileId;
-import static alluxio.client.file.cache.ClientCacheContext.mCacheSpaceLimit;
 
 public class RemoteFileInputStream extends CacheFileInputStream  {
   private long messageId;

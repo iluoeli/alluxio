@@ -1,24 +1,13 @@
 package alluxio.client.file.cache.stream;
 
-import alluxio.Seekable;
-import alluxio.client.block.stream.BlockInStream;
 import alluxio.client.file.FileInStream;
-import alluxio.client.file.cache.ClientCacheContext;
-import alluxio.client.file.cache.MetedataCache;
-import alluxio.exception.PreconditionMessage;
+import alluxio.client.file.cache.core.ClientCacheContext;
 import alluxio.util.io.BufferUtils;
 import alluxio.wire.BlockInfo;
-import com.google.common.base.Preconditions;
-import io.netty.util.concurrent.CompleteFuture;
-import org.apache.avro.file.SeekableByteArrayInput;
-import org.jboss.netty.util.internal.ByteBufferUtil;
 
 import java.io.IOException;
-import java.io.InputStream;
 import java.io.RandomAccessFile;
-import java.nio.Buffer;
 import java.nio.ByteBuffer;
-import java.nio.MappedByteBuffer;
 import java.nio.channels.FileChannel;
 import java.util.ArrayList;
 import java.util.List;

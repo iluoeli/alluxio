@@ -11,7 +11,7 @@
 
 package alluxio.client.file.cache.struct;
 
-import alluxio.client.file.cache.PreviousIterator;
+import alluxio.client.file.cache.core.PreviousIterator;
 
 import java.util.Iterator;
 

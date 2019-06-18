@@ -1,8 +1,7 @@
 package alluxio.client.file.cache.remote.grpc;
 
-import alluxio.client.file.cache.ClientCacheContext;
+import alluxio.client.file.cache.core.ClientCacheContext;
 import alluxio.client.file.cache.buffer.MemoryAllocator;
-import alluxio.client.file.cache.remote.netty.CacheServer;
 import alluxio.client.file.cache.remote.grpc.service.*;
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;

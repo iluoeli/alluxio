@@ -1,6 +1,6 @@
 package alluxio.client.file.cache.submodularLib.stream;
 
-import alluxio.client.file.cache.*;
+import alluxio.client.file.cache.core.*;
 
 import java.util.*;
 

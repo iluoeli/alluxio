@@ -1,8 +1,7 @@
 package alluxio.client.file.cache.submodularLib.cacheSet;
 
-import alluxio.client.file.cache.BaseCacheUnit;
-import alluxio.client.file.cache.CacheUnit;
-import alluxio.client.file.cache.ClientCacheContext;
+import alluxio.client.file.cache.core.BaseCacheUnit;
+import alluxio.client.file.cache.core.CacheUnit;
 import alluxio.client.file.cache.struct.DoubleLinkedList;
 import alluxio.client.file.cache.struct.LongPair;
 import com.google.common.base.Preconditions;

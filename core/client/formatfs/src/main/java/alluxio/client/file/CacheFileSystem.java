@@ -12,9 +12,9 @@
 package alluxio.client.file;
 
 import alluxio.AlluxioURI;
-import alluxio.client.file.cache.ClientCacheContext;
-import alluxio.client.file.cache.FileInStreamWithCache;
-import alluxio.client.file.cache.MetedataCache;
+import alluxio.client.file.cache.core.ClientCacheContext;
+import alluxio.client.file.cache.core.FileInStreamWithCache;
+import alluxio.client.file.cache.core.MetedataCache;
 import alluxio.client.file.options.InStreamOptions;
 import alluxio.client.file.options.OpenFileOptions;
 import alluxio.exception.AlluxioException;
@@ -23,7 +23,7 @@ import alluxio.exception.FileDoesNotExistException;
 
 import java.io.IOException;
 
-import static alluxio.client.file.cache.ClientCacheContext.useMetedata;
+import static alluxio.client.file.cache.core.ClientCacheContext.useMetedata;
 
 public class CacheFileSystem extends BaseFileSystem {
 

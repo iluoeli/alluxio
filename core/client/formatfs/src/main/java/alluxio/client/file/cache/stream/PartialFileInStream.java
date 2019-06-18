@@ -2,22 +2,17 @@ package alluxio.client.file.cache.stream;
 
 import alluxio.Constants;
 import alluxio.client.block.BlockMasterClient;
-import alluxio.client.block.BlockWorkerInfo;
 import alluxio.client.block.stream.BlockInStream;
 import alluxio.client.file.FileInStream;
 import alluxio.client.file.FileSystem;
 import alluxio.client.file.FileSystemContext;
 import alluxio.client.file.URIStatus;
-import alluxio.client.file.cache.ClientCacheContext;
+import alluxio.client.file.cache.core.ClientCacheContext;
 import alluxio.collections.Pair;
 import alluxio.exception.ExceptionMessage;
-import alluxio.exception.PreconditionMessage;
-import alluxio.exception.status.DeadlineExceededException;
 import alluxio.exception.status.NotFoundException;
-import alluxio.exception.status.UnavailableException;
 import alluxio.network.TieredIdentityFactory;
 import alluxio.resource.CloseableResource;
-import alluxio.retry.CountingRetry;
 import alluxio.wire.BlockInfo;
 import alluxio.wire.BlockLocation;
 import alluxio.wire.TieredIdentity;
@@ -26,7 +21,6 @@ import com.google.common.base.Preconditions;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.net.ConnectException;
 import java.util.*;
 
 import static java.util.stream.Collectors.toList;

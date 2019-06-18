@@ -1,6 +1,6 @@
 package alluxio.client.file.cache.submodularLib.cacheSet;
 
-import alluxio.client.file.cache.CacheUnit;
+import alluxio.client.file.cache.core.CacheUnit;
 import alluxio.client.file.cache.submodularLib.SubmodularSetUtils;
 import com.google.common.base.Preconditions;
 

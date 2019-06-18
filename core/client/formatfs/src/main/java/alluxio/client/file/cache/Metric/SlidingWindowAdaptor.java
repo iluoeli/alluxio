@@ -1,6 +1,6 @@
 package alluxio.client.file.cache.Metric;
 
-import alluxio.client.file.cache.PromotionPolicy;
+import alluxio.client.file.cache.core.PromotionPolicy;
 
 import java.util.Iterator;
 import java.util.LinkedList;

@@ -1,10 +1,8 @@
 package alluxio.client.file.cache.remote;
 
-import alluxio.client.file.cache.CacheInternalUnit;
+import alluxio.client.file.cache.core.CacheInternalUnit;
 import io.netty.buffer.ByteBuf;
-import io.netty.buffer.ByteBufAllocator;
 import io.netty.buffer.Unpooled;
-import org.apache.hadoop.yarn.webapp.hamlet.Hamlet;
 
 import java.io.IOException;
 import java.io.RandomAccessFile;

@@ -1,12 +1,10 @@
 package alluxio.client.file.cache.Metric;
 
-import alluxio.client.file.cache.*;
+import alluxio.client.file.cache.core.*;
 import alluxio.client.file.cache.struct.LongPair;
 import alluxio.client.file.cache.submodularLib.cacheSet.CacheSet;
 import alluxio.client.file.cache.submodularLib.cacheSet.HitCalculator;
-import alluxio.exception.AlluxioException;
 
-import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.LinkedBlockingQueue;
 

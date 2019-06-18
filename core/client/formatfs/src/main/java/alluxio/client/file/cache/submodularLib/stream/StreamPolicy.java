@@ -1,15 +1,17 @@
 package alluxio.client.file.cache.submodularLib.stream;
 
-import alluxio.client.file.cache.*;
+import alluxio.client.file.cache.core.BaseCacheUnit;
+import alluxio.client.file.cache.core.CacheInternalUnit;
+import alluxio.client.file.cache.core.ClientCacheContext;
+import alluxio.client.file.cache.core.FileCacheUnit;
 import alluxio.client.file.cache.struct.DoubleLinkedList;
 import alluxio.client.file.cache.struct.LongPair;
-import alluxio.client.file.cache.submodularLib.cacheSet.CacheSet;
 import alluxio.exception.AlluxioException;
 
 import java.io.IOException;
 import java.util.*;
 
-import static alluxio.client.file.cache.ClientCacheContext.mPromotionThreadId;
+import static alluxio.client.file.cache.core.ClientCacheContext.mPromotionThreadId;
 
 public class StreamPolicy implements Runnable {
   private SieveStreamingHandler mStreamHandler;

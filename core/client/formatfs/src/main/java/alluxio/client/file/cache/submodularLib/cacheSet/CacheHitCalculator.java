@@ -1,12 +1,11 @@
 package alluxio.client.file.cache.submodularLib.cacheSet;
 
-import alluxio.client.file.cache.*;
+import alluxio.client.file.cache.core.*;
 import alluxio.client.file.cache.struct.DoubleLinkedList;
 import alluxio.client.file.cache.submodularLib.FunctionCalculator;
 import alluxio.client.file.cache.submodularLib.SubmodularSetUtils;
 import alluxio.collections.Pair;
 import com.google.common.base.Preconditions;
-import sun.misc.Cache;
 
 import java.util.*;
 
