@@ -1,5 +1,6 @@
 package alluxio.client.file.cache.core;
 
+import alluxio.client.file.cache.submodularLib.LRUPolicy;
 import alluxio.client.file.cache.submodularLib.cacheSet.DivideGR;
 import alluxio.client.file.cache.mt.test.TraditionalLFUEvictor;
 import alluxio.client.file.cache.mt.test.TraditionalLRUEvictor;

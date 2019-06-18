@@ -3,6 +3,7 @@ package alluxio.client.file.cache.submodularLib.cacheSet;
 import alluxio.client.file.cache.core.*;
 import alluxio.client.file.cache.struct.DoubleLinkedList;
 import alluxio.client.file.cache.struct.LongPair;
+import alluxio.client.file.cache.submodularLib.LRUPolicy;
 
 import java.util.*;
 
