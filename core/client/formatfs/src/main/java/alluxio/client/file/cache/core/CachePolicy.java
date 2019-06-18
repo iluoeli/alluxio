@@ -2,8 +2,8 @@ package alluxio.client.file.cache.core;
 
 import alluxio.client.file.cache.submodularLib.LRUPolicy;
 import alluxio.client.file.cache.submodularLib.cacheSet.DivideGR;
-import alluxio.client.file.cache.mt.test.TraditionalLFUEvictor;
-import alluxio.client.file.cache.mt.test.TraditionalLRUEvictor;
+import alluxio.client.file.cache.submodularLib.TraditionalLFUEvictor;
+import alluxio.client.file.cache.submodularLib.TraditionalLRUEvictor;
 
 public interface CachePolicy {
   enum PolicyName {

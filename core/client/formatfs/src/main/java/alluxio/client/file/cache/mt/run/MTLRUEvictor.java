@@ -4,7 +4,7 @@ import alluxio.client.file.cache.core.CacheUnit;
 import alluxio.client.file.cache.core.ClientCacheContext;
 import alluxio.client.file.cache.core.TempCacheUnit;
 import alluxio.client.file.cache.core.UnlockTask;
-import alluxio.client.file.cache.mt.test.LRUEvictor;
+import alluxio.client.file.cache.submodularLib.LRUEvictor;
 import alluxio.client.file.cache.mt.run.distributionGenerator.Generator;
 import alluxio.client.file.cache.mt.run.distributionGenerator.LRUGenerator;
 import alluxio.client.file.cache.mt.run.distributionGenerator.ScanGenerator;

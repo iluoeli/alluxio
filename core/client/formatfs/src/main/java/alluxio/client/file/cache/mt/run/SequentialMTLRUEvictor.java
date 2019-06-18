@@ -1,7 +1,7 @@
 package alluxio.client.file.cache.mt.run;
 
 import alluxio.client.file.cache.core.*;
-import alluxio.client.file.cache.mt.test.LRUEvictor;
+import alluxio.client.file.cache.submodularLib.LRUEvictor;
 
 import java.util.*;
 

@@ -2,6 +2,7 @@ package alluxio.client.file.cache.mt.test;
 
 import alluxio.client.HitMetric;
 import alluxio.client.file.cache.core.*;
+import alluxio.client.file.cache.submodularLib.LRUEvictor;
 import alluxio.client.file.cache.submodularLib.cacheSet.CacheSet;
 import alluxio.client.file.cache.submodularLib.cacheSet.DivideGR;
 import org.apache.commons.lang3.RandomUtils;

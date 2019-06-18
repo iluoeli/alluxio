@@ -1,4 +1,4 @@
-package alluxio.client.file.cache.mt.test;
+package alluxio.client.file.cache.submodularLib;
 
 import alluxio.client.file.cache.core.*;
 import alluxio.client.file.cache.struct.LongPair;
