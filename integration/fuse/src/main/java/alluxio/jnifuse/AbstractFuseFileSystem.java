@@ -127,7 +127,21 @@ public abstract class AbstractFuseFileSystem implements FuseFileSystem {
 
   public int readCallback(String path, ByteBuffer buf, long size, long offset, ByteBuffer fibuf) {
     FuseFileInfo fi = new FuseFileInfo(fibuf);
-    return read(path, buf, size, offset, fi);
+    // begin(changed for debug)
+    int pos = buf.position();
+    int ret = read(path, buf, size, offset, fi);
+    if (offset == 0 && size >= 8
+        && buf.get(pos) == 0 && buf.get(pos + 1) == 0
+        && buf.get(pos + 2) == 0 && buf.get(pos + 3) == 0
+        && buf.get(pos + 4) == 0 && buf.get(pos + 5) == 0
+        && buf.get(pos + 6) == 0 && buf.get(pos + 6) == 0) {
+      long tid = Thread.currentThread().getId();
+      org.slf4j.LoggerFactory.getLogger(AbstractFuseFileSystem.class)
+          .warn("AbstractFuseFileSystem.readCallback(file={},offset={},size={}): first 8 bytes all"
+          + " zero, tid = {}", path, offset, size, tid);
+    }
+    return ret;
+    // end(changed for debug)
   }
 
   public int getattrCallback(String path, ByteBuffer buf) {
