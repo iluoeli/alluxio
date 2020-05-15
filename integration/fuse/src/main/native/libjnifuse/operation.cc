@@ -63,6 +63,7 @@ int OpenOperation::call(const char *path, struct fuse_file_info *fi) {
       env->NewDirectByteBuffer((void *)fi, sizeof(struct fuse_file_info));
 
   int ret = env->CallIntMethod(this->obj, this->methodID, jspath, fibuf);
+  LOGD("OFFSET of fd: %d\n", ((char *)&fi->fh - (char *)fi));
 
   env->DeleteLocalRef(jspath);
   env->DeleteLocalRef(fibuf);

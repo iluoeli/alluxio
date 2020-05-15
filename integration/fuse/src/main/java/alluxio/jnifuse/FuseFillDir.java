@@ -33,7 +33,7 @@ public class FuseFillDir {
   }
 
   static {
-    System.loadLibrary("jnifuse");
+    System.loadLibrary("jnifuse3");
   }
 
 }

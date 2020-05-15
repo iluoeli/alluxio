@@ -100,7 +100,6 @@ public final class AlluxioFuse {
       // cache and go directly to alluxio. This avoids extra memory copies
       // in the write path.
       // TODO(binfan): support kernel_cache (issues#10840)
-      fuseOpts.add("-odirect_io");
       if (conf.getBoolean(PropertyKey.FUSE_JNIFUSE_ENABLED)) {
         final AlluxioJniFuseFileSystem fuseFs = new AlluxioJniFuseFileSystem(fs, opts, conf);
         try {
@@ -115,6 +114,8 @@ public final class AlluxioFuse {
           fuseFs.umount();
         }
       } else {
+        // NOTE: in fuse3, direct_io is set in open operation, not here.
+        fuseOpts.add("-odirect_io");
         final AlluxioFuseFileSystem fuseFs = new AlluxioFuseFileSystem(fs, opts, conf);
         try {
           fuseFs.mount(Paths.get(opts.getMountPoint()), true, opts.isDebug(),
@@ -169,7 +170,7 @@ public final class AlluxioFuse {
       }
       // check if the user has specified his own max_write, otherwise get it
       // from conf
-      if (noUserMaxWrite) {
+      if (noUserMaxWrite && !alluxioConf.getBoolean(PropertyKey.FUSE_JNIFUSE_ENABLED)) {
         final long maxWrite = alluxioConf.getBytes(PropertyKey.FUSE_MAXWRITE_BYTES);
         fuseOpts.add(String.format("-omax_write=%d", maxWrite));
       }

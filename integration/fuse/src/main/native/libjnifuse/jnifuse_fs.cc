@@ -14,7 +14,7 @@
 #include <assert.h>
 #include <errno.h>
 #include <fcntl.h>
-#include <fuse.h>
+#include <fuse3/fuse.h>
 #include <jni.h>
 #include <pthread.h>
 #include <stdio.h>

@@ -11,18 +11,18 @@
 CXX := g++
 UNAME := $(shell uname)
 INCDIR = -I /usr/include -I $(JAVA_HOME)/include -I ./
-FUSE_LIBS = $(shell pkg-config fuse --libs)
-FUSE_CXXFLAGS = $(shell pkg-config fuse --cflags)
+FUSE_LIBS = $(shell pkg-config fuse3 --libs)
+FUSE_CXXFLAGS = $(shell pkg-config fuse3 --cflags)
 
 # Linux
 ifeq ($(UNAME), Linux)
 	INCDIR += -I $(JAVA_HOME)/include/linux
-	TARGET_LIB := libjnifuse.so
+	TARGET_LIB := libjnifuse3.so
 endif
 # MacOS
 ifeq ($(UNAME), Darwin)
 	INCDIR += -I $(JAVA_HOME)/include/darwin
-	TARGET_LIB := libjnifuse.dylib
+	TARGET_LIB := libjnifuse3.dylib
 endif
 
 CXXFLAGS = -std=c++11 -Wall -fPIC -D_FILE_OFFSET_BITS=64 ${INCDIR} ${FUSE_CXXFLAGS}

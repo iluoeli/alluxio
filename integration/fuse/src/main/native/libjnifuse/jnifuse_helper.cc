@@ -10,12 +10,12 @@
  */
 
 #ifndef FUSE_USE_VERSION
-#define FUSE_USE_VERSION 26
+#define FUSE_USE_VERSION 31
 #endif
 
 #include <errno.h>
 #include <fcntl.h>
-#include <fuse.h>
+#include <fuse3/fuse.h>
 #include <jni.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -72,7 +72,7 @@ jint JNICALL Java_alluxio_jnifuse_FuseFillDir_fill(JNIEnv *env, jobject obj,
   fuse_fill_dir_t filler = (fuse_fill_dir_t)(void *)address;
   const char *fn = env->GetStringUTFChars(name, 0);
 
-  int ret = filler((void *)bufaddr, fn, NULL, 0);
+  int ret = filler((void *)bufaddr, fn, NULL, 0, (fuse_fill_dir_flags) 0);
   env->ReleaseStringUTFChars(name, fn);
 
   return ret;

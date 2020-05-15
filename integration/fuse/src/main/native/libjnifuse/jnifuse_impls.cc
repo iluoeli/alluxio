@@ -14,7 +14,7 @@
 #include "debug.h"
 #include "jnifuse_fs.h"
 
-int getattr_wrapper(const char *path, struct stat *stbuf) {
+int getattr_wrapper(const char *path, struct stat *stbuf, struct fuse_file_info *fi) {
   LOGD("getattr %s", path);
 
   int ret =
@@ -29,6 +29,10 @@ int open_wrapper(const char *path, struct fuse_file_info *fi) {
   LOGD("open %s", path);
 
   int ret = jnifuse::JniFuseFileSystem::getInstance()->openOper->call(path, fi);
+  /* always enable direct_io for all file */
+  fi->direct_io = 1;
+
+  LOGD("open fd=%llu", fi->fh);
 
   return ret;
 }
@@ -46,7 +50,8 @@ int read_wrapper(const char *path, char *buf, size_t size, off_t offset,
 }
 
 int readdir_wrapper(const char *path, void *buf, fuse_fill_dir_t filler,
-                    off_t offset, struct fuse_file_info *fi) {
+                    off_t offset, struct fuse_file_info *fi,
+                    enum fuse_readdir_flags flags) {
   LOGD("readdir: %s", path);
 
   int ret = jnifuse::JniFuseFileSystem::getInstance()->readdirOper->call(

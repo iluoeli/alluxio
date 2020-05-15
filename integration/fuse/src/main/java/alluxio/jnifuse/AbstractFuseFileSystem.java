@@ -32,7 +32,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 public abstract class AbstractFuseFileSystem implements FuseFileSystem {
 
   static {
-    System.loadLibrary("jnifuse");
+    System.loadLibrary("jnifuse3");
   }
 
   private static final int TIMEOUT = 2000; // ms
