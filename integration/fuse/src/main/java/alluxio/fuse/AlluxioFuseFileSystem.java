@@ -31,6 +31,7 @@ import alluxio.grpc.CreateDirectoryPOptions;
 import alluxio.grpc.CreateFilePOptions;
 import alluxio.grpc.SetAttributePOptions;
 import alluxio.master.MasterClientContext;
+import alluxio.resource.LockResource;
 import alluxio.util.CommonUtils;
 import alluxio.util.ConfigurationUtils;
 import alluxio.util.WaitForOptions;
@@ -69,7 +70,10 @@ import java.util.List;
 import java.util.Set;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.locks.ReadWriteLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 
+import javax.annotation.concurrent.GuardedBy;
 import javax.annotation.concurrent.ThreadSafe;
 
 /**
@@ -80,7 +84,6 @@ import javax.annotation.concurrent.ThreadSafe;
 @ThreadSafe
 public final class AlluxioFuseFileSystem extends FuseStubFS {
   private static final Logger LOG = LoggerFactory.getLogger(AlluxioFuseFileSystem.class);
-  private static final int MAX_OPEN_FILES = Integer.MAX_VALUE;
   private static final int MAX_OPEN_WAITTIME_MS = 5000;
   /**
    * df command will treat -1 as an unknown value.
@@ -136,7 +139,15 @@ public final class AlluxioFuseFileSystem extends FuseStubFS {
   // Keeps a cache of the most recently translated paths from String to Alluxio URI
   private final LoadingCache<String, AlluxioURI> mPathResolverCache;
 
+  private static final int LOCK_SIZE = 1024;
+  /** A readwrite lock pool to guard individual files based on striping. */
+  private final ReadWriteLock[] mFileLocks = new ReentrantReadWriteLock[LOCK_SIZE];
+
+  /** A readwrite lock to guard metadata operations. */
+  private final ReadWriteLock mFileMapLock = new ReentrantReadWriteLock();
+
   // Table of open files with corresponding InputStreams and OutputStreams
+  @GuardedBy("mFileMapLock")
   private final IndexedSet<OpenFileEntry> mOpenFiles;
 
   private AtomicLong mNextOpenFileId = new AtomicLong(0);
@@ -155,7 +166,9 @@ public final class AlluxioFuseFileSystem extends FuseStubFS {
     mFileSystem = fs;
     mAlluxioRootPath = Paths.get(opts.getAlluxioRoot());
     mOpenFiles = new IndexedSet<>(ID_INDEX, PATH_INDEX);
-
+    for (int i = 0; i < LOCK_SIZE; i++) {
+      mFileLocks[i] = new ReentrantReadWriteLock();
+    }
     final int maxCachedPaths = conf.getInt(PropertyKey.FUSE_CACHED_PATHS_MAX);
     mIsUserGroupTranslation
         = conf.getBoolean(PropertyKey.FUSE_USER_GROUP_TRANSLATION_ENABLED);
@@ -165,6 +178,17 @@ public final class AlluxioFuseFileSystem extends FuseStubFS {
 
     Preconditions.checkArgument(mAlluxioRootPath.isAbsolute(),
         "alluxio root path should be absolute");
+  }
+
+  /**
+   * Gets the lock for a particular page. Note that multiple pages may share the same lock as lock
+   * striping is used to reduce resource overhead for locks.
+   *
+   * @param path the file path
+   * @return the corresponding page lock
+   */
+  private ReadWriteLock getFileLock(String path) {
+    return mFileLocks[Math.floorMod(path.hashCode(), LOCK_SIZE)];
   }
 
   /**
@@ -185,7 +209,7 @@ public final class AlluxioFuseFileSystem extends FuseStubFS {
 
     SetAttributePOptions options = SetAttributePOptions.newBuilder()
         .setMode(new alluxio.security.authorization.Mode((short) mode).toProto()).build();
-    try {
+    try (LockResource r1 = new LockResource(getFileLock(path).writeLock())) {
       mFileSystem.setAttribute(uri, options);
     } catch (Throwable t) {
       LOG.error("Failed to change {} to mode {}", path, mode, t);
@@ -217,7 +241,7 @@ public final class AlluxioFuseFileSystem extends FuseStubFS {
       return -ErrorCodes.EOPNOTSUPP();
     }
 
-    try {
+    try (LockResource r1 = new LockResource(getFileLock(path).writeLock())) {
       SetAttributePOptions.Builder optionsBuilder = SetAttributePOptions.newBuilder();
       final AlluxioURI uri = mPathResolverCache.getUnchecked(path);
 
@@ -285,12 +309,7 @@ public final class AlluxioFuseFileSystem extends FuseStubFS {
           path, MAX_NAME_LENGTH);
       return -ErrorCodes.ENAMETOOLONG();
     }
-    try {
-      if (mOpenFiles.size() >= MAX_OPEN_FILES) {
-        LOG.error("Cannot create {}: too many open files (MAX_OPEN_FILES: {})", path,
-            MAX_OPEN_FILES);
-        return -ErrorCodes.EMFILE();
-      }
+    try (LockResource r1 = new LockResource(getFileLock(path).writeLock())) {
       SetAttributePOptions.Builder attributeOptionsBuilder = SetAttributePOptions.newBuilder();
       FuseContext fc = getContext();
       long uid = fc.uid.get();
@@ -320,7 +339,9 @@ public final class AlluxioFuseFileSystem extends FuseStubFS {
               .setMode(new alluxio.security.authorization.Mode((short) mode).toProto())
               .build());
       long fid = mNextOpenFileId.getAndIncrement();
-      mOpenFiles.add(new OpenFileEntry(fid, path, null, os));
+      try (LockResource r = new LockResource(mFileMapLock.writeLock())) {
+        mOpenFiles.add(new OpenFileEntry(fid, path, null, os));
+      }
       fi.fh.set(fid);
       if (gid != GID || uid != UID) {
         LOG.debug("Set attributes of path {} to {}", path, setAttributePOptions);
@@ -356,22 +377,27 @@ public final class AlluxioFuseFileSystem extends FuseStubFS {
 
   private int flushInternal(String path, FuseFileInfo fi) {
     final long fd = fi.fh.get();
-    OpenFileEntry oe = mOpenFiles.getFirstByField(ID_INDEX, fd);
-    if (oe == null) {
-      LOG.error("Cannot find fd for {} in table", path);
-      return -ErrorCodes.EBADFD();
-    }
-    if (oe.getOut() != null) {
-      try {
-        oe.getOut().flush();
-      } catch (IOException e) {
-        LOG.error("Failed to flush {}", path, e);
-        return -ErrorCodes.EIO();
+    try (LockResource r1 = new LockResource(getFileLock(path).writeLock())) {
+      OpenFileEntry oe;
+      try (LockResource r2 = new LockResource(mFileMapLock.readLock())) {
+        oe = mOpenFiles.getFirstByField(ID_INDEX, fd);
       }
-    } else {
-      LOG.debug("Not flushing: {} was not open for writing", path);
+      if (oe == null) {
+        LOG.error("Cannot find fd for {} in table", path);
+        return -ErrorCodes.EBADFD();
+      }
+      if (oe.getOut() != null) {
+        try {
+          oe.getOut().flush();
+        } catch (IOException e) {
+          LOG.error("Failed to flush {}", path, e);
+          return -ErrorCodes.EIO();
+        }
+      } else {
+        LOG.debug("Not flushing: {} was not open for writing", path);
+      }
+      return 0;
     }
-    return 0;
   }
 
   /**
@@ -389,12 +415,16 @@ public final class AlluxioFuseFileSystem extends FuseStubFS {
 
   private int getattrInternal(String path, FileStat stat) {
     final AlluxioURI turi = mPathResolverCache.getUnchecked(path);
-    try {
+    try (LockResource r1 = new LockResource(getFileLock(path).writeLock())) {
       URIStatus status = mFileSystem.getStatus(turi);
       if (!status.isCompleted()) {
         // Always block waiting for file to be completed except when the file is writing
         // We do not want to block the writing process
-        if (!mOpenFiles.contains(PATH_INDEX, path) && !waitForFileCompleted(turi)) {
+        boolean opened;
+        try (LockResource r2 = new LockResource(mFileMapLock.readLock())) {
+          opened = mOpenFiles.contains(PATH_INDEX, path);
+        }
+        if (!opened && !waitForFileCompleted(turi)) {
           LOG.error("File {} is not completed", path);
         }
         status = mFileSystem.getStatus(turi);
@@ -479,7 +509,7 @@ public final class AlluxioFuseFileSystem extends FuseStubFS {
     FuseContext fc = getContext();
     long uid = fc.uid.get();
     long gid = fc.gid.get();
-    try {
+    try (LockResource r1 = new LockResource(getFileLock(path).writeLock())) {
       String groupName = AlluxioFuseUtils.getGroupName(gid);
       if (groupName.isEmpty()) {
         // This should never be reached since input gid is always valid
@@ -531,12 +561,8 @@ public final class AlluxioFuseFileSystem extends FuseStubFS {
     // (see {@code man 2 open} for the structure of the flags bitfield)
     // File creation flags are the last two bits of flags
     final int flags = fi.flags.get();
-    if (mOpenFiles.size() >= MAX_OPEN_FILES) {
-      LOG.error("Cannot open {}: too many open files (MAX_OPEN_FILES: {})", path, MAX_OPEN_FILES);
-      return ErrorCodes.EMFILE();
-    }
     FileInStream is;
-    try {
+    try (LockResource r1 = new LockResource(getFileLock(path).writeLock())) {
       try {
         is = mFileSystem.openFile(uri);
       } catch (FileIncompleteException e) {
@@ -546,6 +572,11 @@ public final class AlluxioFuseFileSystem extends FuseStubFS {
           throw e;
         }
       }
+      long fid = mNextOpenFileId.getAndIncrement();
+      try (LockResource r2 = new LockResource(mFileMapLock.writeLock())) {
+        mOpenFiles.add(new OpenFileEntry(fid, path, is, null));
+      }
+      fi.fh.set(fid);
     } catch (OpenDirectoryException e) {
       LOG.error("Cannot open folder {}", path);
       return -ErrorCodes.EISDIR();
@@ -559,9 +590,6 @@ public final class AlluxioFuseFileSystem extends FuseStubFS {
       LOG.error("Failed to open file {}", path, t);
       return AlluxioFuseUtils.getErrorCode(t);
     }
-    long fid = mNextOpenFileId.getAndIncrement();
-    mOpenFiles.add(new OpenFileEntry(fid, path, is, null));
-    fi.fh.set(fid);
 
     return 0;
   }
@@ -595,35 +623,40 @@ public final class AlluxioFuseFileSystem extends FuseStubFS {
     }
     final int sz = (int) size;
     final long fd = fi.fh.get();
-    OpenFileEntry oe = mOpenFiles.getFirstByField(ID_INDEX, fd);
-    if (oe == null) {
-      LOG.error("Cannot find fd for {} in table", path);
-      return -ErrorCodes.EBADFD();
-    }
-
+    final OpenFileEntry oe;
     int nread = 0;
-    if (oe.getIn() == null) {
-      LOG.error("{} was not open for reading", path);
-      return -ErrorCodes.EBADFD();
-    }
-    synchronized (oe.getIn()) {
-      try {
-        int rd = 0;
-        final byte[] dest = new byte[sz];
-        while (rd >= 0 && nread < size) {
-          rd = oe.getIn().positionedRead(offset, dest, nread, sz - nread);
-          if (rd >= 0) {
-            nread += rd;
-            offset += rd;
-          }
-        }
-        if (nread > 0) {
-          buf.put(0, dest, 0, nread);
-        }
-      } catch (Throwable t) {
-        LOG.error("Failed to read file={}, offset={}, size={}", path, offset, size, t);
-        return AlluxioFuseUtils.getErrorCode(t);
+
+    // Use write lock for now to exclusively access one file
+    // TODO(binfan): make this readlock
+    try (LockResource r1 = new LockResource(getFileLock(path).writeLock())) {
+      try (LockResource r2 = new LockResource(mFileMapLock.readLock())) {
+        oe = mOpenFiles.getFirstByField(ID_INDEX, fd);
       }
+      if (oe == null) {
+        LOG.error("Cannot find fd for {} in table", path);
+        return -ErrorCodes.EBADFD();
+      }
+
+      if (oe.getIn() == null) {
+        LOG.error("{} was not open for reading", path);
+        return -ErrorCodes.EBADFD();
+      }
+
+      int rd = 0;
+      final byte[] dest = new byte[sz];
+      while (rd >= 0 && nread < size) {
+        rd = oe.getIn().positionedRead(offset, dest, nread, sz - nread);
+        if (rd >= 0) {
+          nread += rd;
+          offset += rd;
+        }
+      }
+      if (nread > 0) {
+        buf.put(0, dest, 0, nread);
+      }
+    } catch (Throwable t) {
+      LOG.error("Failed to read file={}, offset={}, size={}", path, offset, size, t);
+      return AlluxioFuseUtils.getErrorCode(t);
     }
     return nread;
   }
@@ -686,18 +719,22 @@ public final class AlluxioFuseFileSystem extends FuseStubFS {
   private int releaseInternal(String path, FuseFileInfo fi) {
     OpenFileEntry oe;
     final long fd = fi.fh.get();
-    oe = mOpenFiles.getFirstByField(ID_INDEX, fd);
-    mOpenFiles.remove(oe);
-    if (oe == null) {
-      LOG.error("Cannot find fd for {} in table", path);
-      return -ErrorCodes.EBADFD();
+    try (LockResource r1 = new LockResource(getFileLock(path).writeLock())) {
+      try (LockResource r2 = new LockResource(mFileMapLock.writeLock())) {
+        oe = mOpenFiles.getFirstByField(ID_INDEX, fd);
+        mOpenFiles.remove(oe);
+      }
+      if (oe == null) {
+        LOG.error("Cannot find fd for {} in table", path);
+        return -ErrorCodes.EBADFD();
+      }
+      try {
+        oe.close();
+      } catch (IOException e) {
+        LOG.error("Failed closing {} [in]", path, e);
+      }
+      return 0;
     }
-    try {
-      oe.close();
-    } catch (IOException e) {
-      LOG.error("Failed closing {} [in]", path, e);
-    }
-    return 0;
   }
 
   /**
@@ -724,9 +761,14 @@ public final class AlluxioFuseFileSystem extends FuseStubFS {
     }
     try {
       mFileSystem.rename(oldUri, newUri);
-      OpenFileEntry oe = mOpenFiles.getFirstByField(PATH_INDEX, oldPath);
-      if (oe != null) {
-        oe.setPath(newPath);
+      long fd;
+      try (LockResource r2 = new LockResource(mFileMapLock.writeLock())) {
+        OpenFileEntry oe = mOpenFiles.getFirstByField(PATH_INDEX, oldPath);
+        if (oe != null) {
+          oe.setPath(newPath);
+          return 0;
+        }
+        fd = oe.getId();
       }
     } catch (FileDoesNotExistException e) {
       LOG.debug("Failed to rename {} to {}, file {} does not exist", oldPath, newPath, oldPath);
@@ -864,34 +906,39 @@ public final class AlluxioFuseFileSystem extends FuseStubFS {
     }
     final int sz = (int) size;
     final long fd = fi.fh.get();
-    OpenFileEntry oe = mOpenFiles.getFirstByField(ID_INDEX, fd);
-    if (oe == null) {
-      LOG.error("Cannot find fd for {} in table", path);
-      return -ErrorCodes.EBADFD();
-    }
+    try (LockResource r1 = new LockResource(getFileLock(path).writeLock())) {
+      OpenFileEntry oe;
+      try (LockResource r2 = new LockResource(mFileMapLock.writeLock())) {
+        oe = mOpenFiles.getFirstByField(ID_INDEX, fd);
+      }
+      if (oe == null) {
+        LOG.error("Cannot find fd for {} in table", path);
+        return -ErrorCodes.EBADFD();
+      }
 
-    if (oe.getOut() == null) {
-      LOG.error("{} already exists in Alluxio and cannot be overwritten."
-          + " Please delete this file first.", path);
-      return -ErrorCodes.EEXIST();
-    }
+      if (oe.getOut() == null) {
+        LOG.error("{} already exists in Alluxio and cannot be overwritten."
+            + " Please delete this file first.", path);
+        return -ErrorCodes.EEXIST();
+      }
 
-    if (offset < oe.getWriteOffset()) {
-      // no op
+      if (offset < oe.getWriteOffset()) {
+        // no op
+        return sz;
+      }
+
+      try {
+        final byte[] dest = new byte[sz];
+        buf.get(0, dest, 0, sz);
+        oe.getOut().write(dest);
+        oe.setWriteOffset(offset + size);
+      } catch (IOException e) {
+        LOG.error("IOException while writing to {}.", path, e);
+        return -ErrorCodes.EIO();
+      }
+
       return sz;
     }
-
-    try {
-      final byte[] dest = new byte[sz];
-      buf.get(0, dest, 0, sz);
-      oe.getOut().write(dest);
-      oe.setWriteOffset(offset + size);
-    } catch (IOException e) {
-      LOG.error("IOException while writing to {}.", path, e);
-      return -ErrorCodes.EIO();
-    }
-
-    return sz;
   }
 
   /**
@@ -903,7 +950,7 @@ public final class AlluxioFuseFileSystem extends FuseStubFS {
   private int rmInternal(String path) {
     final AlluxioURI turi = mPathResolverCache.getUnchecked(path);
 
-    try {
+    try (LockResource r1 = new LockResource(getFileLock(path).writeLock())) {
       mFileSystem.delete(turi);
     } catch (FileDoesNotExistException | InvalidPathException e) {
       LOG.debug("Failed to remove {}, file does not exist or is invalid", path);
