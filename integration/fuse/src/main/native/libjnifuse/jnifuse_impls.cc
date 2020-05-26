@@ -40,6 +40,13 @@ int read_wrapper(const char *path, char *buf, size_t size, off_t offset,
   int ret = jnifuse::JniFuseFileSystem::getInstance()->readOper->call(
       path, buf, size, offset, fi);
 
+  // begin (added for debug)
+  if (offset == 0 && size > 8
+      && buf[0] == 0 && buf[1] == 0 && buf[2] == 0 && buf[3] == 0
+      && buf[4] == 0 && buf[5] == 0 && buf[6] == 0 && buf[7] == 0) {
+    LOGD("read(file=%s,offset=%d,size=%d): first 8 bytes all zero", path, offset, size)
+  }
+  // begin (added for debug)
   LOGD("nread=%d", ret);
 
   return ret;

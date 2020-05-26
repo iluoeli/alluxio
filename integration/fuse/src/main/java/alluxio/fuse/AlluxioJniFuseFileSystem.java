@@ -178,6 +178,15 @@ public final class AlluxioJniFuseFileSystem extends AbstractFuseFileSystem {
         nread = 0;
       } else if (nread > 0) {
         buf.put(dest, 0, nread);
+        // begin(added for debug)
+        if (offset == 0 && size >= 8
+            && dest[0] == 0 && dest[1] == 0 && dest[2] == 0 && dest[3] == 0
+            && dest[4] == 0 && dest[5] == 0 && dest[6] == 0 && dest[7] == 0) {
+          long tid = Thread.currentThread().getId();
+          LOG.warn("AlluxioJniFuseFilesSystem.read(file={},offset={},size={}): first 8 bytes all "
+              + "zero, tid = {}", path, offset, size, tid);
+        }
+        // end(added for debug)
       }
     } catch (Throwable e) {
       LOG.error("Failed to read {},{},{}: ", path, size, offset, e);
