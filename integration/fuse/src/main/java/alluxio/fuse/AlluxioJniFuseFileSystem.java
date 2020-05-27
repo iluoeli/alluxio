@@ -31,6 +31,7 @@ import com.google.common.cache.LoadingCache;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.FileInputStream;
 import java.nio.ByteBuffer;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -178,6 +179,30 @@ public final class AlluxioJniFuseFileSystem extends AbstractFuseFileSystem {
         nread = 0;
       } else if (nread > 0) {
         buf.put(dest, 0, nread);
+        // begin(added for debug nan)
+        final String LOCAL_ROOT = "/root/imagenet/train";
+        String localPath = LOCAL_ROOT + path.substring(path.lastIndexOf("/"));
+        try {
+          FileInputStream fis = new FileInputStream(localPath);
+          byte[] tmpbuf = new byte[nread];
+          long nskipped = fis.skip(offset);
+          int nread2 = fis.read(tmpbuf, 0, (int)nread);
+          if (nread2 == nread) {
+            for (int i=0; i < nread; i++) {
+              if (tmpbuf[i] != dest[i]) {
+                LOG.error("byte at {} not consistency ({} ！= {})", offset+i, dest[i], tmpbuf[i]);
+                break;
+              }
+            }
+          } else {
+            LOG.error("nread not equal ({} != {})", nread, nread2);
+          }
+          fis.close();
+        } catch (IndexOutOfBoundsException e) {
+          e.printStackTrace();
+        }
+        //end(added for debug nan)
+
         // begin(added for debug)
         if (offset == 0 && size >= 8
             && dest[0] == 0 && dest[1] == 0 && dest[2] == 0 && dest[3] == 0
