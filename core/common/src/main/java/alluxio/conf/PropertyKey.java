@@ -4072,6 +4072,22 @@ public final class PropertyKey implements Comparable<PropertyKey> {
           .setConsistencyCheckLevel(ConsistencyCheckLevel.IGNORE)
           .setScope(Scope.CLIENT)
           .build();
+  public static final PropertyKey FUSE_JNIFUSE_LOCALROOT =
+      new Builder(Name.FUSE_JNIFUSE_LOCALROOT)
+          .setDefaultValue("/home/luoyl/test2")
+          .setDescription("(Experimental) Check consistency of AlluxioJniFuseFileSystem "
+              + "with local file system.")
+          .setConsistencyCheckLevel(ConsistencyCheckLevel.IGNORE)
+          .setScope(Scope.CLIENT)
+          .build();
+  public static final PropertyKey FUSE_JNIFUSE_LOCALCHECK_ENABLED =
+      new Builder(Name.FUSE_JNIFUSE_LOCALCHECK_ENABLED)
+          .setDefaultValue(false)
+          .setDescription("(Experimental) Check consistency of AlluxioJniFuseFileSystem "
+              + "with local file system.")
+          .setConsistencyCheckLevel(ConsistencyCheckLevel.IGNORE)
+          .setScope(Scope.CLIENT)
+          .build();
   public static final PropertyKey FUSE_LOGGING_THRESHOLD =
       new Builder(Name.FUSE_LOGGING_THRESHOLD)
           .setDefaultValue("10s")
@@ -5383,6 +5399,9 @@ public final class PropertyKey implements Comparable<PropertyKey> {
     public static final String FUSE_DEBUG_ENABLED = "alluxio.fuse.debug.enabled";
     public static final String FUSE_FS_NAME = "alluxio.fuse.fs.name";
     public static final String FUSE_JNIFUSE_ENABLED = "alluxio.fuse.jnifuse.enabled";
+    public static final String FUSE_JNIFUSE_LOCALROOT = "alluxio.fuse.jnifuse.localroot";
+    public static final String FUSE_JNIFUSE_LOCALCHECK_ENABLED =
+        "alluxio.fuse.jnifuse.localcheck.enabled";
     public static final String FUSE_LOGGING_THRESHOLD = "alluxio.fuse.logging.threshold";
     public static final String FUSE_MAXWRITE_BYTES = "alluxio.fuse.maxwrite.bytes";
     public static final String FUSE_USER_GROUP_TRANSLATION_ENABLED =

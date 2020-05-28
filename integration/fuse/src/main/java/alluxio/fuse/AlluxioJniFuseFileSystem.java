@@ -74,6 +74,9 @@ public final class AlluxioJniFuseFileSystem extends AbstractFuseFileSystem {
   @VisibleForTesting
   public static final int MAX_NAME_LENGTH = 255;
 
+  final String LOCAL_ROOT;
+  final Boolean LOCAL_CHECK_ENABLED;
+
   public AlluxioJniFuseFileSystem(
       FileSystem fs, AlluxioFuseOptions opts, AlluxioConfiguration conf) {
     super(Paths.get(opts.getMountPoint()));
@@ -85,6 +88,9 @@ public final class AlluxioJniFuseFileSystem extends AbstractFuseFileSystem {
     mPathResolverCache = CacheBuilder.newBuilder()
         .maximumSize(maxCachedPaths)
         .build(new PathCacheLoader());
+
+    LOCAL_ROOT = conf.get(PropertyKey.FUSE_JNIFUSE_LOCALROOT);
+    LOCAL_CHECK_ENABLED = conf.getBoolean(PropertyKey.FUSE_JNIFUSE_LOCALCHECK_ENABLED);
   }
 
   @Override
@@ -179,27 +185,45 @@ public final class AlluxioJniFuseFileSystem extends AbstractFuseFileSystem {
         nread = 0;
       } else if (nread > 0) {
         buf.put(dest, 0, nread);
+
         // begin(added for debug nan)
-        final String LOCAL_ROOT = "/root/imagenet/train";
-        String localPath = LOCAL_ROOT + path.substring(path.lastIndexOf("/"));
-        try {
-          FileInputStream fis = new FileInputStream(localPath);
-          byte[] tmpbuf = new byte[nread];
-          long nskipped = fis.skip(offset);
-          int nread2 = fis.read(tmpbuf, 0, (int)nread);
-          if (nread2 == nread) {
-            for (int i=0; i < nread; i++) {
-              if (tmpbuf[i] != dest[i]) {
-                LOG.error("byte at {} not consistency ({} ！= {})", offset+i, dest[i], tmpbuf[i]);
-                break;
+        if (LOCAL_CHECK_ENABLED) {
+          String localPath = LOCAL_ROOT + path.substring(path.lastIndexOf("/"));
+          FileInputStream fis = null;
+          try {
+            fis = new FileInputStream(localPath);
+            byte[] tmpbuf = new byte[nread];
+            long nskipped = fis.skip(offset);
+            int nread2 = fis.read(tmpbuf, 0, (int)nread);
+            if (nread2 == nread) {
+              for (int i=0; i < nread; i++) {
+                if (tmpbuf[i] != dest[i]) {
+                  LOG.error("byte at {} not consistency ({} ！= {})", offset+i, dest[i], tmpbuf[i]);
+                  break;
+                }
               }
+              if (offset == 0 && size >= 8) {
+                LOG.warn("AlluxioJniFuseFilesSystem.read(file={},offset={},size={}): "
+                    + "check-consistency passed", path, offset, size);
+              }
+            } else {
+              LOG.error("nread not equal ({} != {})", nread, nread2);
             }
-          } else {
-            LOG.error("nread not equal ({} != {})", nread, nread2);
+          } catch (IndexOutOfBoundsException e) {
+            e.printStackTrace();
+          } catch (Exception e) {
+            e.printStackTrace();
+            LOG.error("Exception occurred while reading local file system");
+          } finally {
+            try {
+              if (fis != null) {
+                fis.close();
+              }
+            } catch (Exception e) {
+              LOG.error("FileInputStream close failed");
+              e.printStackTrace();
+            }
           }
-          fis.close();
-        } catch (IndexOutOfBoundsException e) {
-          e.printStackTrace();
         }
         //end(added for debug nan)
 
