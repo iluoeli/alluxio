@@ -4074,7 +4074,7 @@ public final class PropertyKey implements Comparable<PropertyKey> {
           .build();
   public static final PropertyKey FUSE_JNIFUSE_LOCALROOT =
       new Builder(Name.FUSE_JNIFUSE_LOCALROOT)
-          .setDefaultValue("/home/luoyl/test2")
+          .setDefaultValue("/root/imagenet")
           .setDescription("(Experimental) Check consistency of AlluxioJniFuseFileSystem "
               + "with local file system.")
           .setConsistencyCheckLevel(ConsistencyCheckLevel.IGNORE)
