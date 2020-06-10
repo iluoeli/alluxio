@@ -12,7 +12,6 @@
 package alluxio.fuse;
 
 import alluxio.AlluxioURI;
-import alluxio.client.file.BaseFileSystem;
 import alluxio.client.file.FileInStream;
 import alluxio.client.file.FileSystem;
 import alluxio.client.file.URIStatus;
@@ -28,9 +27,11 @@ import alluxio.util.ThreadUtils;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
+import com.google.common.cache.RemovalNotification;
 import com.google.common.io.Closer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -67,6 +68,16 @@ public final class AlluxioJniFuseFileSystem extends AbstractFuseFileSystem {
   private final Path mAlluxioRootPath;
   // Keeps a cache of the most recently translated paths from String to Alluxio URI
   private final LoadingCache<String, AlluxioURI> mPathResolverCache;
+  private final Cache<String, FileInStream> mInStreamCache = CacheBuilder.newBuilder()
+      .maximumSize(2048)
+      .removalListener((RemovalNotification<String, FileInStream> removal) -> {
+        FileInStream is = removal.getValue();
+        try {
+          is.close(); // tear down properly
+        } catch (Exception e) {
+          // ignore
+        }
+      }).build();
   private final AtomicLong mNextOpenFileId = new AtomicLong(0);
   private final String mFsName;
 
@@ -189,12 +200,21 @@ public final class AlluxioJniFuseFileSystem extends AbstractFuseFileSystem {
   public int open(String path, FuseFileInfo fi) {
     final AlluxioURI uri = mPathResolverCache.getUnchecked(path);
     try {
+      FileInStream is;
+      synchronized (mInStreamCache) {
+        is = mInStreamCache.getIfPresent(path);
+        if (is != null) {
+          mInStreamCache.invalidate(path);
+        }
+      }
       long fd = mNextOpenFileId.getAndIncrement();
-      FileInStream is = mFileSystem.openFile(uri);
+      if (is == null) {
+        is = mFileSystem.openFile(uri);
+      }
       mOpenFiles.put(fd, new OpenFileEntry(path, is));
       fi.fh.set(fd);
       LOG.info("open(fd={},entries={})", fd, mOpenFiles.size());
-      ((BaseFileSystem) mFileSystem).getFileSystemContext().printAvailableBlockWorkerClient();
+      //((BaseFileSystem) mFileSystem).getFileSystemContext().printAvailableBlockWorkerClient();
       return 0;
     } catch (Throwable e) {
       LOG.error("Failed to open {}: ", path, e);
@@ -248,7 +268,7 @@ public final class AlluxioJniFuseFileSystem extends AbstractFuseFileSystem {
     final OpenFileEntry oe;
     long fd = fi.fh.get();
     LOG.info("release(fd={},entries={})", fd, mOpenFiles.size());
-    ((BaseFileSystem) mFileSystem).getFileSystemContext().printAvailableBlockWorkerClient();
+    //((BaseFileSystem) mFileSystem).getFileSystemContext().printAvailableBlockWorkerClient();
     try (LockResource r1 = new LockResource(getFileLock(fd).writeLock())) {
       oe = mOpenFiles.remove(fd);
       if (oe == null) {
@@ -339,7 +359,7 @@ public final class AlluxioJniFuseFileSystem extends AbstractFuseFileSystem {
       mPath = path;
       mCount = new AtomicInteger(1);
       mCloser = Closer.create();
-      mCloser.register(mIn);
+      //mCloser.register(mIn);
     }
 
     /**
@@ -359,16 +379,12 @@ public final class AlluxioJniFuseFileSystem extends AbstractFuseFileSystem {
       return mIn;
     }
 
-    /**
-     * @return the ref count
-     */
-    public AtomicInteger getCount() {
-      return mCount;
-    }
-
     @Override
     public void close() throws IOException {
-      mCloser.close();
+      //mCloser.close();
+      synchronized (mInStreamCache) {
+        mInStreamCache.put(mPath, mIn);
+      }
     }
   }
 }

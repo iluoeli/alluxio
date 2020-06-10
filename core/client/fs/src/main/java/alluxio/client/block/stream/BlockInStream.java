@@ -11,6 +11,7 @@
 
 package alluxio.client.block.stream;
 
+import alluxio.Constants;
 import alluxio.conf.AlluxioConfiguration;
 import alluxio.conf.PropertyKey;
 import alluxio.Seekable;
@@ -62,6 +63,7 @@ public class BlockInStream extends InputStream implements BoundedStream, Seekabl
   private final long mLength;
 
   private final byte[] mSingleByte = new byte[1];
+  private final byte[] mSeekBuffer = new byte[Constants.MB];
 
   /** Current position of the stream, relative to the start of the block. */
   private long mPos = 0;
@@ -330,7 +332,11 @@ public class BlockInStream extends InputStream implements BoundedStream, Seekabl
     if (pos < mPos) {
       mEOF = false;
     }
-
+    // Debug:
+    if (pos > mPos && (pos - mPos) < Constants.MB) {
+      read(mSeekBuffer, 0, (int) (pos - mPos));
+      return;
+    }
     closeDataReader();
     mPos = pos;
   }
