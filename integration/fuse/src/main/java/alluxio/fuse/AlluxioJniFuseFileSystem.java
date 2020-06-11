@@ -32,6 +32,7 @@ import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
 import com.google.common.io.Closer;
+import com.google.common.math.StatsAccumulator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -194,7 +195,6 @@ public final class AlluxioJniFuseFileSystem extends AbstractFuseFileSystem {
       mOpenFiles.put(fd, new OpenFileEntry(path, is));
       fi.fh.set(fd);
       LOG.info("open(fd={},entries={})", fd, mOpenFiles.size());
-      ((BaseFileSystem) mFileSystem).getFileSystemContext().printAvailableBlockWorkerClient();
       return 0;
     } catch (Throwable e) {
       LOG.error("Failed to open {}: ", path, e);
@@ -204,6 +204,11 @@ public final class AlluxioJniFuseFileSystem extends AbstractFuseFileSystem {
 
   @Override
   public int read(String path, ByteBuffer buf, long size, long offset, FuseFileInfo fi) {
+    StatsAccumulator sa = ((BaseFileSystem) mFileSystem).getFileSystemContext().getSeekStats();
+    if (sa.count() > 2 && (sa.count() % 100 == 1)) {
+      LOG.info("seek: count {}, mean {}, max {}, min {}, std {}",
+          sa.count(), sa.mean(), sa.max(), sa.min(), sa.sampleVariance());
+    }
     final AlluxioURI uri = mPathResolverCache.getUnchecked(path);
     int nread = 0;
     int rd = 0;
@@ -248,7 +253,7 @@ public final class AlluxioJniFuseFileSystem extends AbstractFuseFileSystem {
     final OpenFileEntry oe;
     long fd = fi.fh.get();
     LOG.info("release(fd={},entries={})", fd, mOpenFiles.size());
-    ((BaseFileSystem) mFileSystem).getFileSystemContext().printAvailableBlockWorkerClient();
+    //((BaseFileSystem) mFileSystem).getFileSystemContext().printAvailableBlockWorkerClient();
     try (LockResource r1 = new LockResource(getFileLock(fd).writeLock())) {
       oe = mOpenFiles.remove(fd);
       if (oe == null) {
