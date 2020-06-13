@@ -11,6 +11,7 @@
 
 package alluxio.worker.block;
 
+import alluxio.Constants;
 import alluxio.conf.ServerConfiguration;
 import alluxio.conf.PropertyKey;
 import alluxio.exception.BlockAlreadyExistsException;
@@ -84,7 +85,8 @@ import javax.annotation.concurrent.NotThreadSafe;
 @NotThreadSafe // TODO(jiri): make thread-safe (c.f. ALLUXIO-1624)
 public class TieredBlockStore implements BlockStore {
   private static final Logger LOG = LoggerFactory.getLogger(TieredBlockStore.class);
-
+  private static final Logger EVICT_LOGGER =
+      new alluxio.util.logging.SamplingLogger(LOG, 10L * Constants.SECOND_MS);
   private final BlockMetadataManager mMetaManager;
   private final BlockLockManager mLockManager;
   private final Allocator mAllocator;
@@ -374,7 +376,11 @@ public class TieredBlockStore implements BlockStore {
   @Override
   public void removeBlock(long sessionId, long blockId, BlockStoreLocation location)
       throws InvalidWorkerStateException, BlockDoesNotExistException, IOException {
-    LOG.debug("removeBlock: sessionId={}, blockId={}, location={}", sessionId, blockId, location);
+    // begin: update for debugging
+    LOG.info("removeBlock: sessionId={}, blockId={}, location={}", sessionId, blockId, location);
+    EVICT_LOGGER.info("{}",
+        alluxio.util.ThreadUtils.formatStackTrace(Thread.currentThread()));
+    // end: update for debugging
     long lockId = mLockManager.lockBlock(sessionId, blockId, BlockLockType.WRITE);
 
     BlockMeta blockMeta;
