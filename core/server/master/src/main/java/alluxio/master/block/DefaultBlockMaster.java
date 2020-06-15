@@ -421,8 +421,11 @@ public final class DefaultBlockMaster extends CoreMaster implements BlockMaster 
     for (MasterWorkerInfo worker : mWorkers) {
       synchronized (worker) {
         ret += worker.getUsedBytes();
+        LOG.info("getUsedBytes: worker {}: {}", worker, worker.getUsedBytes());
       }
     }
+    LOG.info("getUsedBytes: {}", ret);
+    LOG.info("{}", alluxio.util.ThreadUtils.formatStackTrace(Thread.currentThread()));
     return ret;
   }
 
@@ -549,6 +552,10 @@ public final class DefaultBlockMaster extends CoreMaster implements BlockMaster 
 
   @Override
   public void removeBlocks(List<Long> blockIds, boolean delete) throws UnavailableException {
+    // begin: added for debug
+    LOG.info("removeBlocks: {}, {}", blockIds, delete);
+    LOG.info("{}", alluxio.util.ThreadUtils.formatStackTrace(Thread.currentThread()));
+    // end: added for debug
     try (JournalContext journalContext = createJournalContext()) {
       for (long blockId : blockIds) {
         HashSet<Long> workerIds = new HashSet<>();
@@ -594,6 +601,10 @@ public final class DefaultBlockMaster extends CoreMaster implements BlockMaster 
   @Override
   public void validateBlocks(Function<Long, Boolean> validator, boolean repair)
       throws UnavailableException {
+    // begin: added for debug
+    LOG.info("validateBlocks: {}, {}", validator, repair);
+    LOG.info("{}", alluxio.util.ThreadUtils.formatStackTrace(Thread.currentThread()));
+    // end: added for debug
     List<Long> invalidBlocks = new ArrayList<>();
     for (Iterator<Block> iter = mBlockStore.iterator(); iter.hasNext(); ) {
       long id = iter.next().getId();
@@ -669,7 +680,7 @@ public final class DefaultBlockMaster extends CoreMaster implements BlockMaster 
   public void commitBlock(long workerId, long usedBytesOnTier, String tierAlias,
       String mediumType, long blockId, long length)
       throws NotFoundException, UnavailableException {
-    LOG.debug("Commit block from workerId: {}, usedBytesOnTier: {}, blockId: {}, length: {}",
+    LOG.info("Commit block from workerId: {}, usedBytesOnTier: {}, blockId: {}, length: {}",
         workerId, usedBytesOnTier, blockId, length);
 
     MasterWorkerInfo worker = mWorkers.getFirstByField(ID_INDEX, workerId);
@@ -716,7 +727,7 @@ public final class DefaultBlockMaster extends CoreMaster implements BlockMaster 
 
   @Override
   public void commitBlockInUFS(long blockId, long length) throws UnavailableException {
-    LOG.debug("Commit block in ufs. blockId: {}, length: {}", blockId, length);
+    LOG.info("Commit block in ufs. blockId: {}, length: {}", blockId, length);
     try (JournalContext journalContext = createJournalContext();
          LockResource lr = lockBlock(blockId)) {
       if (mBlockStore.getBlock(blockId).isPresent()) {
@@ -767,9 +778,13 @@ public final class DefaultBlockMaster extends CoreMaster implements BlockMaster 
         for (Map.Entry<String, Long> entry : worker.getUsedBytesOnTiers().entrySet()) {
           Long used = ret.get(entry.getKey());
           ret.put(entry.getKey(), (used == null ? 0L : used) + entry.getValue());
+          LOG.info("getUsedBytesOnTiers: worker {}, tier {}: {}", worker, entry.getKey(),
+              entry.getValue());
         }
       }
     }
+    LOG.info("getUsedBytesOnTiers: {}", ret);
+    LOG.info("{}", alluxio.util.ThreadUtils.formatStackTrace(Thread.currentThread()));
     return ret;
   }
 
@@ -964,11 +979,15 @@ public final class DefaultBlockMaster extends CoreMaster implements BlockMaster 
   @GuardedBy("workerInfo")
   private void processWorkerRemovedBlocks(MasterWorkerInfo workerInfo,
       Collection<Long> removedBlockIds) {
+    // begin: added for debug
+    LOG.info("processWorkerRemovedBlocks: {}, {}", workerInfo, removedBlockIds);
+    LOG.info("{}", alluxio.util.ThreadUtils.formatStackTrace(Thread.currentThread()));
+    // end: added for debug
     for (long removedBlockId : removedBlockIds) {
       try (LockResource lr = lockBlock(removedBlockId)) {
         Optional<BlockMeta> block = mBlockStore.getBlock(removedBlockId);
         if (block.isPresent()) {
-          LOG.debug("Block {} is removed on worker {}.", removedBlockId, workerInfo.getId());
+          LOG.info("Block {} is removed on worker {}.", removedBlockId, workerInfo.getId());
           mBlockStore.removeLocation(removedBlockId, workerInfo.getId());
           if (mBlockStore.getLocations(removedBlockId).size() == 0) {
             mLostBlocks.add(removedBlockId);

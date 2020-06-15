@@ -13,6 +13,8 @@ package alluxio.master.file;
 
 import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableList;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -24,6 +26,8 @@ import java.util.List;
  * Class for tracking which blocks need to be deleted, and deleting them on close.
  */
 public final class DefaultBlockDeletionContext implements BlockDeletionContext {
+  private static final Logger LOG = LoggerFactory.getLogger(DefaultBlockDeletionContext.class);
+
   private final List<BlockDeletionListener> mListeners;
   private final List<Long> mBlocks;
 
@@ -37,11 +41,19 @@ public final class DefaultBlockDeletionContext implements BlockDeletionContext {
 
   @Override
   public void registerBlocksForDeletion(Collection<Long> blockIds) {
+    // begin: added for debug
+    LOG.info("registerBlocksForDeletion: {}", blockIds);
+    LOG.info("{}", alluxio.util.ThreadUtils.formatStackTrace(Thread.currentThread()));
+    // end: added for debug
     mBlocks.addAll(blockIds);
   }
 
   @Override
   public void registerBlockForDeletion(long blockId) {
+    // begin: added for debug
+    LOG.info("registerBlocksForDeletion: {}", blockId);
+    LOG.info("{}", alluxio.util.ThreadUtils.formatStackTrace(Thread.currentThread()));
+    // end: added for debug
     mBlocks.add(blockId);
   }
 
