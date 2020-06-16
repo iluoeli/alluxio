@@ -77,6 +77,8 @@ public final class AlluxioJniFuseFileSystem extends AbstractFuseFileSystem {
 
   private final Map<Long, BufferedOpenFileEntry> mOpenFiles = new ConcurrentHashMap<>();
 
+  private final Map<String, OpenFileEntry> mOpenFileEntryCache = new ConcurrentHashMap<>();
+
   private final long mMaxCacheSize;
 
   // To make test build
@@ -126,6 +128,19 @@ public final class AlluxioJniFuseFileSystem extends AbstractFuseFileSystem {
    */
   private ReadWriteLock getFileLock(long fd) {
     return mFileLocks[Math.floorMod((int) fd, LOCK_SIZE)];
+  }
+
+  private OpenFileEntry getOpenFileEntry(String path) {
+    return mOpenFileEntryCache.remove(path);
+  }
+
+  private void closeOrCacheOpenFileEntry(OpenFileEntry oe) throws IOException {
+    if (mOpenFileEntryCache.get(oe.mPath) != null) {
+      // we can only cache 1 entry for each file
+      oe.close();
+    } else {
+      mOpenFileEntryCache.put(oe.mPath, oe);
+    }
   }
 
   @Override
@@ -191,6 +206,20 @@ public final class AlluxioJniFuseFileSystem extends AbstractFuseFileSystem {
 
   @Override
   public int open(String path, FuseFileInfo fi) {
+    StatsAccumulator sa = ((BaseFileSystem) mFileSystem).getFileSystemContext().getEntryCacheStats();
+    if (sa.count() > 2 && (sa.count() % 100 == 1)) {
+      LOG.info("entry cache: count {}, hit {}, hit ratio {}",
+          sa.count(), sa.sum(), sa.mean());
+    }
+    OpenFileEntry oe = getOpenFileEntry(path);
+    if (oe != null) {
+      sa.add(1.0);
+      long fd = mNextOpenFileId.getAndIncrement();
+      mOpenFiles.put(fd, new BufferedOpenFileEntry(oe, mMaxCacheSize));
+      fi.fh.set(fd);
+      return 0;
+    }
+    sa.add(0.0);
     final AlluxioURI uri = mPathResolverCache.getUnchecked(path);
     try {
       long fd = mNextOpenFileId.getAndIncrement();
@@ -262,7 +291,8 @@ public final class AlluxioJniFuseFileSystem extends AbstractFuseFileSystem {
         LOG.error("Cannot find fd {} for {}", fd, path);
         return -ErrorCodes.EBADFD();
       }
-      oe.close();
+      closeOrCacheOpenFileEntry(oe.mOpenFileEntry);
+      // oe.close();
     } catch (Throwable e) {
       LOG.error("Failed closing {}", path, e);
       return -ErrorCodes.EIO();
@@ -291,6 +321,16 @@ public final class AlluxioJniFuseFileSystem extends AbstractFuseFileSystem {
   public void umount() {
     LOG.info("Umount AlluxioJniFuseFileSystem, {}",
         ThreadUtils.formatStackTrace(Thread.currentThread()));
+    for (String path: mOpenFileEntryCache.keySet()) {
+      OpenFileEntry oe = mOpenFileEntryCache.remove(path);
+      if (oe != null) {
+        try {
+          oe.close();
+        } catch (IOException e) {
+          LOG.error("Failed to close {}", path);
+        }
+      }
+    }
     super.umount();
   }
 
