@@ -4072,6 +4072,13 @@ public final class PropertyKey implements Comparable<PropertyKey> {
           .setConsistencyCheckLevel(ConsistencyCheckLevel.IGNORE)
           .setScope(Scope.CLIENT)
           .build();
+  public static final PropertyKey FUSE_JNIFUSE_CACHEPERCENT=
+      new Builder(Name.FUSE_JNIFUSE_CACHEPERCENT)
+          .setDefaultValue(0.5)
+          .setDescription("(Experimental) The percentage of files will be enabled with kernel_cache.")
+          .setConsistencyCheckLevel(ConsistencyCheckLevel.IGNORE)
+          .setScope(Scope.CLIENT)
+          .build();
   public static final PropertyKey FUSE_LOGGING_THRESHOLD =
       new Builder(Name.FUSE_LOGGING_THRESHOLD)
           .setDefaultValue("10s")
@@ -5383,6 +5390,7 @@ public final class PropertyKey implements Comparable<PropertyKey> {
     public static final String FUSE_DEBUG_ENABLED = "alluxio.fuse.debug.enabled";
     public static final String FUSE_FS_NAME = "alluxio.fuse.fs.name";
     public static final String FUSE_JNIFUSE_ENABLED = "alluxio.fuse.jnifuse.enabled";
+    public static final String FUSE_JNIFUSE_CACHEPERCENT = "alluxio.fuse.jnifuse.cachepercent";
     public static final String FUSE_LOGGING_THRESHOLD = "alluxio.fuse.logging.threshold";
     public static final String FUSE_MAXWRITE_BYTES = "alluxio.fuse.maxwrite.bytes";
     public static final String FUSE_USER_GROUP_TRANSLATION_ENABLED =

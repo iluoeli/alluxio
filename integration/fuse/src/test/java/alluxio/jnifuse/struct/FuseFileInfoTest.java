@@ -27,5 +27,6 @@ public class FuseFileInfoTest {
         ru.serce.jnrfuse.struct.FuseFileInfo.of(Pointer.wrap(Runtime.getSystemRuntime(), 0x0));
     assertEquals(jnrfi.flags.offset(), jnifi.flags.offset());
     assertEquals(jnrfi.fh.offset(), jnifi.fh.offset());
+    assertEquals(jnrfi.lock_owner.offset(), jnifi.lock_owner.offset());
   }
 }

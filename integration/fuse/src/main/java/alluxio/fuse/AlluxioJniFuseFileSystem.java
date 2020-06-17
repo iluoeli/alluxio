@@ -44,6 +44,7 @@ import java.nio.file.Paths;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.Random;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
@@ -76,6 +77,8 @@ public final class AlluxioJniFuseFileSystem extends AbstractFuseFileSystem {
   private final ReadWriteLock[] mFileLocks = new ReentrantReadWriteLock[LOCK_SIZE];
 
   private final Map<Long, OpenFileEntry> mOpenFiles = new ConcurrentHashMap<>();
+
+  private final float mCachePercent;
 
   // To make test build
   @VisibleForTesting
@@ -112,6 +115,7 @@ public final class AlluxioJniFuseFileSystem extends AbstractFuseFileSystem {
     for (int i = 0; i < LOCK_SIZE; i++) {
       mFileLocks[i] = new ReentrantReadWriteLock();
     }
+    mCachePercent = conf.getFloat(PropertyKey.FUSE_JNIFUSE_CACHEPERCENT);
   }
 
   /**
@@ -191,8 +195,17 @@ public final class AlluxioJniFuseFileSystem extends AbstractFuseFileSystem {
     final AlluxioURI uri = mPathResolverCache.getUnchecked(path);
     try {
       long fd = mNextOpenFileId.getAndIncrement();
+      int interval = Math.round(1 / mCachePercent);
+      boolean enableCache = (fd % interval == 0);
+      if (enableCache) {
+        fi.enableKernelCache();
+      } else {
+        fi.enableDirectIO();
+      }
       FileInStream is = mFileSystem.openFile(uri);
-      mOpenFiles.put(fd, new OpenFileEntry(path, is));
+      // must save enableCache flag in OpenFileEntry manually,
+      // because it will not be set in read operation.
+      mOpenFiles.put(fd, new OpenFileEntry(path, is, enableCache));
       fi.fh.set(fd);
       LOG.info("open(fd={},entries={})", fd, mOpenFiles.size());
       return 0;
@@ -214,31 +227,55 @@ public final class AlluxioJniFuseFileSystem extends AbstractFuseFileSystem {
     int rd = 0;
     final int sz = (int) size;
     long fd = fi.fh.get();
-    // FileInStream is not thread safe
-    try (LockResource r1 = new LockResource(getFileLock(fd).writeLock())) {
-      OpenFileEntry oe = mOpenFiles.get(fd);
-      if (oe == null) {
-        LOG.error("Cannot find fd {} for {}", fd, path);
-        return -ErrorCodes.EBADFD();
-      }
-      oe.getIn().seek(offset);
-      FileInStream is = oe.getIn();
-      final byte[] dest = new byte[sz];
-      while (rd >= 0 && nread < size) {
-        rd = is.read(dest, nread, sz - nread);
-        if (rd >= 0) {
-          nread += rd;
+    // try get OpenFileEntry and check if kernel_cache enabled
+    OpenFileEntry oe = mOpenFiles.get(fd);
+    if (oe == null) {
+      LOG.error("Cannot find fd {} for {}", fd, path);
+      return -ErrorCodes.EBADFD();
+    }
+    if (oe.mEnableCache) {
+      // FileInStream is not thread safe
+      try (LockResource r1 = new LockResource(getFileLock(fd).writeLock())) {
+        oe.getIn().seek(offset);
+        FileInStream is = oe.getIn();
+        final byte[] dest = new byte[sz];
+        while (rd >= 0 && nread < size) {
+          rd = is.read(dest, nread, sz - nread);
+          if (rd >= 0) {
+            nread += rd;
+          }
         }
-      }
 
-      if (nread == -1) { // EOF
-        nread = 0;
-      } else if (nread > 0) {
-        buf.put(dest, 0, nread);
+        if (nread == -1) { // EOF
+          nread = 0;
+        } else if (nread > 0) {
+          buf.put(dest, 0, nread);
+        }
+      } catch (Throwable e) {
+        LOG.error("Failed to read {},{},{}: ", path, size, offset, e);
+        return -ErrorCodes.EIO();
       }
-    } catch (Throwable e) {
-      LOG.error("Failed to read {},{},{}: ", path, size, offset, e);
-      return -ErrorCodes.EIO();
+    } else {
+      try {
+        oe.getIn().seek(offset);
+        FileInStream is = oe.getIn();
+        final byte[] dest = new byte[sz];
+        while (rd >= 0 && nread < size) {
+          rd = is.read(dest, nread, sz - nread);
+          if (rd >= 0) {
+            nread += rd;
+          }
+        }
+
+        if (nread == -1) { // EOF
+          nread = 0;
+        } else if (nread > 0) {
+          buf.put(dest, 0, nread);
+        }
+      } catch (Throwable e) {
+        LOG.error("Failed to read {},{},{}: ", path, size, offset, e);
+        return -ErrorCodes.EIO();
+      }
     }
     return nread;
   }
@@ -250,20 +287,35 @@ public final class AlluxioJniFuseFileSystem extends AbstractFuseFileSystem {
 
   @Override
   public int release(String path, FuseFileInfo fi) {
-    final OpenFileEntry oe;
+    OpenFileEntry oe;
     long fd = fi.fh.get();
     LOG.info("release(fd={},entries={})", fd, mOpenFiles.size());
     //((BaseFileSystem) mFileSystem).getFileSystemContext().printAvailableBlockWorkerClient();
-    try (LockResource r1 = new LockResource(getFileLock(fd).writeLock())) {
-      oe = mOpenFiles.remove(fd);
-      if (oe == null) {
-        LOG.error("Cannot find fd {} for {}", fd, path);
-        return -ErrorCodes.EBADFD();
+    oe = mOpenFiles.get(fd);
+    if (oe.mEnableCache) {
+      try (LockResource r1 = new LockResource(getFileLock(fd).writeLock())) {
+        oe = mOpenFiles.remove(fd);
+        if (oe == null) {
+          LOG.error("Cannot find fd {} for {}", fd, path);
+          return -ErrorCodes.EBADFD();
+        }
+        oe.close();
+      } catch (Throwable e) {
+        LOG.error("Failed closing {}", path, e);
+        return -ErrorCodes.EIO();
       }
-      oe.close();
-    } catch (Throwable e) {
-      LOG.error("Failed closing {}", path, e);
-      return -ErrorCodes.EIO();
+    } else {
+      try {
+        oe = mOpenFiles.remove(fd);
+        if (oe == null) {
+          LOG.error("Cannot find fd {} for {}", fd, path);
+          return -ErrorCodes.EBADFD();
+        }
+        oe.close();
+      } catch (Throwable e) {
+        LOG.error("Failed closing {}", path, e);
+        return -ErrorCodes.EIO();
+      }
     }
     return 0;
   }
@@ -327,6 +379,8 @@ public final class AlluxioJniFuseFileSystem extends AbstractFuseFileSystem {
     // Path is likely to be changed when fuse rename() is called
     private String mPath;
 
+    private boolean mEnableCache;
+
     /** the ref count.  */
     private final AtomicInteger mCount;
 
@@ -338,13 +392,14 @@ public final class AlluxioJniFuseFileSystem extends AbstractFuseFileSystem {
      * @param path the path of the file
      * @param in the input stream of the file
      */
-    public OpenFileEntry(String path, FileInStream in) {
+    public OpenFileEntry(String path, FileInStream in, boolean enableCache) {
       Preconditions.checkNotNull(in, "in");
       mIn = in;
       mPath = path;
       mCount = new AtomicInteger(1);
       mCloser = Closer.create();
       mCloser.register(mIn);
+      mEnableCache = enableCache;
     }
 
     /**

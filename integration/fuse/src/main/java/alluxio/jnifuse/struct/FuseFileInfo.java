@@ -19,18 +19,31 @@ public class FuseFileInfo extends Struct {
     super(buffer);
     flags = new Signed32();
     fh_old = new UnsignedLong();
+    // FIXME(iluoeli): offset of writepage should be 16, not 12.
+    pad1 = new Padding(4);
     writepage = new Signed32();
-    pad1 = new Padding(2);
+    fuse_flags = new Unsigned32();
     fh = new u_int64_t();
     lock_owner = new u_int64_t();
   }
 
   public final Signed32 flags;
   public final UnsignedLong fh_old;
-  public final Signed32 writepage;
   public final Padding pad1;
+  public final Signed32 writepage;
+  public final Unsigned32 fuse_flags;
   public final u_int64_t fh;
   public final u_int64_t lock_owner;
+
+  public void enableDirectIO() {
+    int flag = fuse_flags.intValue();
+    fuse_flags.set(flag | 0x1);
+  }
+
+  public void enableKernelCache() {
+    int flag = fuse_flags.intValue();
+    fuse_flags.set(flag | 0x2);
+  }
 
   public static FuseFileInfo wrap(ByteBuffer buffer) {
     return new FuseFileInfo(buffer);
