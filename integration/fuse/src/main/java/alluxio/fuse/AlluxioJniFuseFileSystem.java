@@ -222,6 +222,9 @@ public final class AlluxioJniFuseFileSystem extends AbstractFuseFileSystem {
     int rd = 0;
     final int sz = (int) size;
     long fd = fi.fh.get();
+    if (fd % 100 == 1) {
+      LOG.info("read(path={},fd={},size={},offset={})", path, fd, size, offset);
+    }
     // FileInStream is not thread safe
     try (LockResource r1 = new LockResource(getFileLock(fd).writeLock())) {
       OpenFileEntry oe = mOpenFiles.get(fd);
