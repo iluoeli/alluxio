@@ -196,7 +196,7 @@ public final class AlluxioJniFuseFileSystem extends AbstractFuseFileSystem {
       long fd = mNextOpenFileId.getAndIncrement();
       FileInStream is = mFileSystem.openFile(uri);
       BufferedOpenFileEntry entry = new BufferedOpenFileEntry(
-          new OpenFileEntry(path, is), mMaxCacheSize);
+          new OpenFileEntry(path, is), new CacheResource(mMaxCacheSize));
       mOpenFiles.put(fd, entry);
       fi.fh.set(fd);
       LOG.info("open(fd={},entries={})", fd, mOpenFiles.size());
@@ -380,32 +380,47 @@ public final class AlluxioJniFuseFileSystem extends AbstractFuseFileSystem {
   }
 
   @ThreadSafe
-  private final class BufferedOpenFileEntry {
-    private final OpenFileEntry mOpenFileEntry;
-    private long mOffset;
-    private long  mLimit;
-    private final long mMaxCacheSize;
-    private final byte[] mCache;
+  private final class CacheResource {
+    public long mOffset;
+    public long  mLimit;
+    public final long mMaxCacheSize;
+    public final byte[] mCache;
 
-    public BufferedOpenFileEntry(OpenFileEntry entry, long maxCacheSize) {
-      mOpenFileEntry = entry;
-      mMaxCacheSize = maxCacheSize;
+    public CacheResource(long maxCacheSize) {
       mOffset = -1;
       mLimit = -1;
+      mMaxCacheSize = maxCacheSize;
       mCache = new byte[(int) mMaxCacheSize];
+    }
+
+    public void reset() {
+      mOffset = -1;
+      mLimit = -1;
+    }
+  }
+
+  @ThreadSafe
+  private final class BufferedOpenFileEntry {
+    private final OpenFileEntry mOpenFileEntry;
+    private final CacheResource mCacheResource;
+
+    public BufferedOpenFileEntry(OpenFileEntry entry, CacheResource resource) {
+      mOpenFileEntry = entry;
+      mCacheResource = resource;
+      mCacheResource.reset();
     }
 
     public int read(byte[] buf, long offset, long len) throws IOException {
       int nread = 0;
       StatsAccumulator sa = ((BaseFileSystem) mFileSystem).getFileSystemContext().getCacheStats();
       try {
-        if (offset < mOffset || (offset + len) > mLimit) {
+        if (offset < mCacheResource.mOffset || (offset + len) > mCacheResource.mLimit) {
           sa.add(0.0);
           mOpenFileEntry.mIn.seek(offset);
           int ncached = 0;
           int rd = 0;
           while (rd >= 0 && ncached < mMaxCacheSize) {
-            rd = mOpenFileEntry.mIn.read(mCache, ncached, (int) mMaxCacheSize - ncached);
+            rd = mOpenFileEntry.mIn.read(mCacheResource.mCache, ncached, (int) mMaxCacheSize - ncached);
             if (rd >= 0) {
               ncached += rd;
             }
@@ -413,15 +428,15 @@ public final class AlluxioJniFuseFileSystem extends AbstractFuseFileSystem {
           if (ncached == -1) {
             return 0;
           }
-          mOffset = offset;
-          mLimit = mOffset + ncached;
+          mCacheResource.mOffset = offset;
+          mCacheResource.mLimit = mCacheResource.mOffset + ncached;
         }
         sa.add(1.0);
-        System.arraycopy(mCache, (int) (offset - mOffset), buf, 0, (int) len);
-        nread = (int) Math.min(len, mLimit - offset);
+        System.arraycopy(mCacheResource.mCache, (int) (offset - mCacheResource.mOffset), buf, 0, (int) len);
+        nread = (int) Math.min(len, mCacheResource.mLimit - offset);
       } catch (IOException e) {
-        mOffset = -1;
-        mLimit = -1;
+        mCacheResource.mOffset = -1;
+        mCacheResource.mLimit = -1;
         LOG.error("Failed to read(path={}, offset={}, len={})",
             mOpenFileEntry.mPath, offset, len);
         throw e;
@@ -431,6 +446,7 @@ public final class AlluxioJniFuseFileSystem extends AbstractFuseFileSystem {
 
     public void close() throws IOException {
       mOpenFileEntry.close();
+      mCacheResource.reset();
     }
   }
 }
