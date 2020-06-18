@@ -204,18 +204,13 @@ public final class AlluxioJniFuseFileSystem extends AbstractFuseFileSystem {
 
   @Override
   public int read(String path, ByteBuffer buf, long size, long offset, FuseFileInfo fi) {
-    StatsAccumulator sa = ((BaseFileSystem) mFileSystem).getFileSystemContext().getSeekStats();
-    if (sa.count() > 2 && (sa.count() % 100 == 1)) {
-      LOG.info("seek: count {}, mean {}, max {}, min {}, std {}",
-          sa.count(), sa.mean(), sa.max(), sa.min(), sa.sampleVariance());
-    }
     final AlluxioURI uri = mPathResolverCache.getUnchecked(path);
     int nread = 0;
     int rd = 0;
     final int sz = (int) size;
     long fd = fi.fh.get();
     // FileInStream is not thread safe
-    try (LockResource r1 = new LockResource(getFileLock(fd).writeLock())) {
+    try {
       OpenFileEntry oe = mOpenFiles.get(fd);
       if (oe == null) {
         LOG.error("Cannot find fd {} for {}", fd, path);
@@ -254,7 +249,7 @@ public final class AlluxioJniFuseFileSystem extends AbstractFuseFileSystem {
     long fd = fi.fh.get();
     LOG.info("release(fd={},entries={})", fd, mOpenFiles.size());
     //((BaseFileSystem) mFileSystem).getFileSystemContext().printAvailableBlockWorkerClient();
-    try (LockResource r1 = new LockResource(getFileLock(fd).writeLock())) {
+    try {
       oe = mOpenFiles.remove(fd);
       if (oe == null) {
         LOG.error("Cannot find fd {} for {}", fd, path);
