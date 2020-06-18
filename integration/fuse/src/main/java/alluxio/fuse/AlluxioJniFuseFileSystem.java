@@ -44,7 +44,9 @@ import java.nio.file.Paths;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.NoSuchElementException;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.ReadWriteLock;
@@ -78,6 +80,8 @@ public final class AlluxioJniFuseFileSystem extends AbstractFuseFileSystem {
   private final Map<Long, BufferedOpenFileEntry> mOpenFiles = new ConcurrentHashMap<>();
 
   private final long mMaxCacheSize;
+
+  private final LinkedBlockingQueue<CacheResource> mCacheResourcePool;
 
   // To make test build
   @VisibleForTesting
@@ -115,6 +119,7 @@ public final class AlluxioJniFuseFileSystem extends AbstractFuseFileSystem {
       mFileLocks[i] = new ReentrantReadWriteLock();
     }
     mMaxCacheSize = conf.getBytes(PropertyKey.FUSE_MAXCACHE_BYTES);
+    mCacheResourcePool = new LinkedBlockingQueue<>();
   }
 
   /**
@@ -126,6 +131,21 @@ public final class AlluxioJniFuseFileSystem extends AbstractFuseFileSystem {
    */
   private ReadWriteLock getFileLock(long fd) {
     return mFileLocks[Math.floorMod((int) fd, LOCK_SIZE)];
+  }
+
+  private CacheResource applyCacheResource() {
+    CacheResource resource = null;
+    try {
+      resource = mCacheResourcePool.remove();
+    } catch (NoSuchElementException e) {
+      resource = new CacheResource(mMaxCacheSize);
+    }
+    return resource;
+  }
+
+  private void restoreCacheResource(CacheResource resource) {
+    resource.reset();
+    mCacheResourcePool.offer(resource);
   }
 
   @Override
@@ -195,8 +215,11 @@ public final class AlluxioJniFuseFileSystem extends AbstractFuseFileSystem {
     try {
       long fd = mNextOpenFileId.getAndIncrement();
       FileInStream is = mFileSystem.openFile(uri);
+      if (fd % 100 == 1) {
+        LOG.error("CacheResourcePool: size {}", mCacheResourcePool.size());
+      }
       BufferedOpenFileEntry entry = new BufferedOpenFileEntry(
-          new OpenFileEntry(path, is), new CacheResource(mMaxCacheSize));
+          new OpenFileEntry(path, is), applyCacheResource());
       mOpenFiles.put(fd, entry);
       fi.fh.set(fd);
       LOG.info("open(fd={},entries={})", fd, mOpenFiles.size());
@@ -446,7 +469,7 @@ public final class AlluxioJniFuseFileSystem extends AbstractFuseFileSystem {
 
     public void close() throws IOException {
       mOpenFileEntry.close();
-      mCacheResource.reset();
+      restoreCacheResource(mCacheResource);
     }
   }
 }
