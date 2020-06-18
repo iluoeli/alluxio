@@ -4079,6 +4079,13 @@ public final class PropertyKey implements Comparable<PropertyKey> {
           .setConsistencyCheckLevel(ConsistencyCheckLevel.IGNORE)
           .setScope(Scope.CLIENT)
           .build();
+  public static final PropertyKey FUSE_CACHEPOOL_MAXIDLE =
+      new Builder(Name.FUSE_CACHEPOOL_MAXIDLE)
+          .setDefaultValue(10)
+          .setDescription("(Experimental) Maximum number of CacheResource that are not used.")
+          .setConsistencyCheckLevel(ConsistencyCheckLevel.IGNORE)
+          .setScope(Scope.CLIENT)
+          .build();
   public static final PropertyKey FUSE_LOGGING_THRESHOLD =
       new Builder(Name.FUSE_LOGGING_THRESHOLD)
           .setDefaultValue("10s")
@@ -5393,6 +5400,7 @@ public final class PropertyKey implements Comparable<PropertyKey> {
     public static final String FUSE_LOGGING_THRESHOLD = "alluxio.fuse.logging.threshold";
     public static final String FUSE_MAXWRITE_BYTES = "alluxio.fuse.maxwrite.bytes";
     public static final String FUSE_MAXCACHE_BYTES = "alluxio.fuse.maxcache.bytes";
+    public static final String FUSE_CACHEPOOL_MAXIDLE = "alluxio.fuse.cachepool.maxidle";
     public static final String FUSE_USER_GROUP_TRANSLATION_ENABLED =
         "alluxio.fuse.user.group.translation.enabled";
 

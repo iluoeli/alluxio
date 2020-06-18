@@ -81,7 +81,10 @@ public final class AlluxioJniFuseFileSystem extends AbstractFuseFileSystem {
 
   private final long mMaxCacheSize;
 
+  private final int  mMaxIdleCacheResource;
+
   private final LinkedBlockingQueue<CacheResource> mCacheResourcePool;
+  private AtomicLong mNumCacheResourceCreated = new AtomicLong();
 
   // To make test build
   @VisibleForTesting
@@ -119,7 +122,8 @@ public final class AlluxioJniFuseFileSystem extends AbstractFuseFileSystem {
       mFileLocks[i] = new ReentrantReadWriteLock();
     }
     mMaxCacheSize = conf.getBytes(PropertyKey.FUSE_MAXCACHE_BYTES);
-    mCacheResourcePool = new LinkedBlockingQueue<>();
+    mMaxIdleCacheResource = conf.getInt(PropertyKey.FUSE_CACHEPOOL_MAXIDLE);
+    mCacheResourcePool = new LinkedBlockingQueue<>(mMaxIdleCacheResource);
   }
 
   /**
@@ -139,13 +143,20 @@ public final class AlluxioJniFuseFileSystem extends AbstractFuseFileSystem {
       resource = mCacheResourcePool.remove();
     } catch (NoSuchElementException e) {
       resource = new CacheResource(mMaxCacheSize);
+      long n = mNumCacheResourceCreated.incrementAndGet();
+      if (n % 100 == 1) {
+        LOG.info("NumCacheResourceCreated: {}", n);
+      }
     }
     return resource;
   }
 
   private void restoreCacheResource(CacheResource resource) {
-    resource.reset();
-    mCacheResourcePool.offer(resource);
+    try {
+      mCacheResourcePool.offer(resource);
+    } catch (Exception e) {
+      LOG.error("Failed to restore CacheResource");
+    }
   }
 
   @Override
@@ -222,7 +233,7 @@ public final class AlluxioJniFuseFileSystem extends AbstractFuseFileSystem {
           new OpenFileEntry(path, is), applyCacheResource());
       mOpenFiles.put(fd, entry);
       fi.fh.set(fd);
-      LOG.info("open(fd={},entries={})", fd, mOpenFiles.size());
+//      LOG.info("open(fd={},entries={})", fd, mOpenFiles.size());
       return 0;
     } catch (Throwable e) {
       LOG.error("Failed to open {}: ", path, e);
@@ -283,7 +294,7 @@ public final class AlluxioJniFuseFileSystem extends AbstractFuseFileSystem {
   public int release(String path, FuseFileInfo fi) {
     final BufferedOpenFileEntry oe;
     long fd = fi.fh.get();
-    LOG.info("release(fd={},entries={})", fd, mOpenFiles.size());
+//    LOG.info("release(fd={},entries={})", fd, mOpenFiles.size());
     //((BaseFileSystem) mFileSystem).getFileSystemContext().printAvailableBlockWorkerClient();
     try (LockResource r1 = new LockResource(getFileLock(fd).writeLock())) {
       oe = mOpenFiles.remove(fd);
