@@ -233,14 +233,20 @@ public final class AlluxioJniFuseFileSystem extends AbstractFuseFileSystem {
   @Override
   public int read(String path, ByteBuffer buf, long size, long offset, FuseFileInfo fi) {
     StatsAccumulator sa = ((BaseFileSystem) mFileSystem).getFileSystemContext().getSeekStats();
-    if (sa.count() > 2 && (sa.count() % 100 == 1)) {
+    if (sa.count() > 2 && (sa.count() % 1000 == 1)) {
       LOG.info("seek: count {}, mean {}, max {}, min {}, std {}",
           sa.count(), sa.mean(), sa.max(), sa.min(), sa.sampleVariance());
     }
     StatsAccumulator cachesa = ((BaseFileSystem) mFileSystem).getFileSystemContext().getCacheStats();
+    StatsAccumulator cacheSeqSeekStats = ((BaseFileSystem) mFileSystem).getFileSystemContext()
+        .getCacheSeqSeekStats();
     if (cachesa.count() > 2 && (cachesa.count() % 1000) == 1) {
       LOG.info("cache: count {}, hit {}, hit ratio {}",
           cachesa.count(), cachesa.sum(), cachesa.mean());
+    }
+    if (cacheSeqSeekStats.count() > 2 && (cacheSeqSeekStats.count() % 1000) == 1) {
+      LOG.info("CacheSeekStatus: count {}, sequential seek {}, sequential ratio {}",
+          cacheSeqSeekStats.count(), cacheSeqSeekStats.sum(), cacheSeqSeekStats.mean());
     }
     final AlluxioURI uri = mPathResolverCache.getUnchecked(path);
     int nread = 0;
@@ -405,13 +411,13 @@ public final class AlluxioJniFuseFileSystem extends AbstractFuseFileSystem {
   @ThreadSafe
   private final class CacheResource {
     public long mOffset;
-    public long  mLimit;
+    public long mLimit;
+    public long mPos;
     public final long mMaxCacheSize;
     public final byte[] mCache;
 
     public CacheResource(long maxCacheSize) {
-      mOffset = -1;
-      mLimit = -1;
+      reset();
       mMaxCacheSize = maxCacheSize;
       mCache = new byte[(int) mMaxCacheSize];
     }
@@ -419,6 +425,7 @@ public final class AlluxioJniFuseFileSystem extends AbstractFuseFileSystem {
     public void reset() {
       mOffset = -1;
       mLimit = -1;
+      mPos = 0;
     }
   }
 
@@ -436,10 +443,20 @@ public final class AlluxioJniFuseFileSystem extends AbstractFuseFileSystem {
     public int read(byte[] buf, long offset, long len) throws IOException {
       int nread = 0;
       StatsAccumulator sa = ((BaseFileSystem) mFileSystem).getFileSystemContext().getCacheStats();
+      StatsAccumulator cacheSeqSeekStats = ((BaseFileSystem) mFileSystem).getFileSystemContext().getCacheSeqSeekStats();
       try {
         if (offset < mCacheResource.mOffset || (offset + len) > mCacheResource.mLimit) {
           sa.add(0.0);
-          mOpenFileEntry.mIn.seek(offset);
+          // if possible, cache starts from the minimum offset that has not been accessed
+          if (mCacheResource.mPos <= offset && (offset + len) <= (mCacheResource.mPos + mMaxCacheSize)) {
+            mOpenFileEntry.mIn.seek(mCacheResource.mPos);
+            mCacheResource.mOffset = mCacheResource.mPos;
+            cacheSeqSeekStats.add(1.0);
+          } else {
+            mOpenFileEntry.mIn.seek(offset);
+            mCacheResource.mOffset = offset;
+            cacheSeqSeekStats.add(0.0);
+          }
           int ncached = 0;
           int rd = 0;
           while (rd >= 0 && ncached < mMaxCacheSize) {
@@ -451,12 +468,15 @@ public final class AlluxioJniFuseFileSystem extends AbstractFuseFileSystem {
           if (ncached == -1) {
             return 0;
           }
-          mCacheResource.mOffset = offset;
           mCacheResource.mLimit = mCacheResource.mOffset + ncached;
         }
         sa.add(1.0);
         System.arraycopy(mCacheResource.mCache, (int) (offset - mCacheResource.mOffset), buf, 0, (int) len);
         nread = (int) Math.min(len, mCacheResource.mLimit - offset);
+        if (offset <= mCacheResource.mPos) {
+          // mPos step forward
+          mCacheResource.mPos = Long.max(mCacheResource.mPos, offset + nread + 1);
+        }
       } catch (IOException e) {
         mCacheResource.mOffset = -1;
         mCacheResource.mLimit = -1;
