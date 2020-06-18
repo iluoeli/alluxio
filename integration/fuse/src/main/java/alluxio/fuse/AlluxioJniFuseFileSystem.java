@@ -207,26 +207,19 @@ public final class AlluxioJniFuseFileSystem extends AbstractFuseFileSystem {
 
   @Override
   public int read(String path, ByteBuffer buf, long size, long offset, FuseFileInfo fi) {
-    StatsAccumulator sa = ((BaseFileSystem) mFileSystem).getFileSystemContext().getSeekStats();
-    if (sa.count() > 2 && (sa.count() % 100 == 1)) {
-      LOG.info("seek: count {}, mean {}, max {}, min {}, std {}",
-          sa.count(), sa.mean(), sa.max(), sa.min(), sa.sampleVariance());
-    }
-    StatsAccumulator cachesa = ((BaseFileSystem) mFileSystem).getFileSystemContext().getCacheStats();
-    if (cachesa.count() > 2 && (cachesa.count() % 1000) == 1) {
-      LOG.info("cache: count {}, hit {}, hit ratio {}",
-          cachesa.count(), cachesa.sum(), cachesa.mean());
-    }
     final AlluxioURI uri = mPathResolverCache.getUnchecked(path);
     int nread = 0;
     int rd = 0;
     final int sz = (int) size;
     long fd = fi.fh.get();
-    if (fd % 100 == 1) {
-      LOG.info("read(path={},fd={},size={},offset={})", path, fd, size, offset);
-    }
     // FileInStream is not thread safe
+    if (fd % 100 == 1) {
+      LOG.info("before lock: read(fd={},size={},offset={})", fd, size, offset);
+    }
     try (LockResource r1 = new LockResource(getFileLock(fd).writeLock())) {
+      if (fd % 100 == 1) {
+        LOG.info("after lock: read(path={},fd={},size={},offset={})", path, fd, size, offset);
+      }
       OpenFileEntry oe = mOpenFiles.get(fd);
       if (oe == null) {
         LOG.error("Cannot find fd {} for {}", fd, path);
@@ -378,10 +371,8 @@ public final class AlluxioJniFuseFileSystem extends AbstractFuseFileSystem {
 
     public int read(byte[] buf, long offset, long len) throws IOException {
       int nread = 0;
-      StatsAccumulator sa = ((BaseFileSystem) mFileSystem).getFileSystemContext().getCacheStats();
       try {
         if (offset < mOffset || (offset + len) > mLimit) {
-          sa.add(0.0);
           mIn.seek(offset);
           int ncached = 0;
           int rd = 0;
@@ -397,7 +388,6 @@ public final class AlluxioJniFuseFileSystem extends AbstractFuseFileSystem {
           mOffset = offset;
           mLimit = mOffset + ncached;
         }
-        sa.add(1.0);
         System.arraycopy(mCache, (int) (offset - mOffset), buf, 0, (int) len);
         nread = (int) Math.min(len, mLimit - offset);
       } catch (IOException e) {
