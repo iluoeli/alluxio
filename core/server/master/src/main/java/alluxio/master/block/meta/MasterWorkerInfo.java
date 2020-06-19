@@ -175,6 +175,9 @@ public final class MasterWorkerInfo {
    * @param blockId the id of the block to be removed
    */
   public void removeBlock(long blockId) {
+    // begin: added for debug
+    LOG.info("MasterWorkerInfo::removeBlock {}, {}", this, blockId);
+    // end: added for debug
     mBlocks.remove(blockId);
     mToRemoveBlocks.remove(blockId);
   }

@@ -1594,6 +1594,11 @@ public final class DefaultFileSystemMaster extends CoreMaster
       DirectoryNotEmptyException, InvalidPathException {
     Preconditions.checkState(inodePath.getLockPattern() == LockPattern.WRITE_EDGE);
 
+    // begin: added for debug
+    LOG.info("deleteInternal: {}", inodePath.toString());
+    LOG.info("{}", alluxio.util.ThreadUtils.formatStackTrace(Thread.currentThread()));
+    // end: added for debug
+
     // TODO(jiri): A crash after any UFS object is deleted and before the delete operation is
     // journaled will result in an inconsistency between Alluxio and UFS.
     if (!inodePath.fullPathExists()) {
@@ -2425,6 +2430,10 @@ public final class DefaultFileSystemMaster extends CoreMaster
   private void freeInternal(RpcContext rpcContext, LockedInodePath inodePath, FreeContext context)
       throws FileDoesNotExistException, UnexpectedAlluxioException,
       IOException, InvalidPathException, AccessControlException {
+    // begin: added for debug
+    LOG.info("freeInternal: {}", inodePath.toString());
+    LOG.info("{}", alluxio.util.ThreadUtils.formatStackTrace(Thread.currentThread()));
+    // end: added for debug
     Inode inode = inodePath.getInode();
     if (inode.isDirectory() && !context.getOptions().getRecursive()
         && mInodeStore.hasChildren(inode.asDirectory())) {
