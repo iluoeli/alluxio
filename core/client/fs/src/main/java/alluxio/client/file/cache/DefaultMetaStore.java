@@ -32,14 +32,14 @@ public class DefaultMetaStore implements MetaStore {
   /** The number of pages stored. */
   private final AtomicLong mPages = new AtomicLong(0);
   private final PageStoreType mStoreType;
-  private final int mPageSize;
+  private final long mPageSize;
 
   /**
    * @param conf Conf
    */
   public DefaultMetaStore(AlluxioConfiguration conf) {
     mStoreType = conf.getEnum(PropertyKey.USER_CLIENT_CACHE_STORE_TYPE, PageStoreType.class);
-    mPageSize = conf.getInt(PropertyKey.USER_CLIENT_CACHE_PAGE_SIZE);
+    mPageSize = conf.getBytes(PropertyKey.USER_CLIENT_CACHE_PAGE_SIZE);
   }
 
   @Override
