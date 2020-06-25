@@ -26,6 +26,7 @@ import com.codahale.metrics.Meter;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Suppliers;
 import com.google.common.io.Closer;
+import com.google.common.math.StatsAccumulator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -44,6 +45,7 @@ public class LocalCacheFileInStream extends FileInStream {
   protected final long mPageSize;
 
   private final byte[] mSingleByte = new byte[1];
+  private final byte[] mExternalPageBuffer;
   private final Closer mCloser = Closer.create();
 
   /** Local store to store pages. */
@@ -56,6 +58,7 @@ public class LocalCacheFileInStream extends FileInStream {
   private final URIStatus mStatus;
   private final OpenFilePOptions mOpenOptions;
 
+  private StatsAccumulator mCacheStats = null;
   /** Stream reading from the external file system, opened once. */
   private FileInStream mExternalFileInStream;
   /** Current position of the stream, relative to the start of the file. */
@@ -78,6 +81,10 @@ public class LocalCacheFileInStream extends FileInStream {
     mOpenOptions = options;
     mExternalFs = externalFs;
     mCacheManager = cacheManager;
+    mExternalPageBuffer = new byte[(int) mPageSize];
+    if (mExternalFs.getFileSystemContext() != null) {
+      mCacheStats = mExternalFs.getFileSystemContext().getCacheStats();
+    }
     // Lazy init of status object
     mStatus = Suppliers.memoize(() -> {
       try {
@@ -104,6 +111,10 @@ public class LocalCacheFileInStream extends FileInStream {
     mOpenOptions = options;
     mExternalFs = externalFs;
     mCacheManager = cacheManager;
+    mExternalPageBuffer = new byte[(int) mPageSize];
+    if (mExternalFs.getFileSystemContext() != null) {
+      mCacheStats = mExternalFs.getFileSystemContext().getCacheStats();
+    }
     // Lazy init of status object
     mStatus = status;
     Metrics.registerGauges();
@@ -146,12 +157,16 @@ public class LocalCacheFileInStream extends FileInStream {
       int bytesRead =
           mCacheManager.get(pageId, currentPageOffset, bytesLeftInPage, b, off + totalBytesRead);
       if (bytesRead > 0) {
-        mExternalFs.getFileSystemContext().getCacheStats().add(1.0);
+        if (mCacheStats != null) {
+          mCacheStats.add(1.0);
+        }
         totalBytesRead += bytesRead;
         mPosition += bytesRead;
         Metrics.BYTES_READ_CACHE.mark(bytesRead);
       } else {
-        mExternalFs.getFileSystemContext().getCacheStats().add(0.0);
+        if (mCacheStats != null) {
+          mCacheStats.add(0.0);
+        }
         // on local cache miss, read a complete page from external storage. This will always make
         // progress or throw an exception
         byte[] page = readExternalPage(mPosition);
@@ -313,7 +328,12 @@ public class LocalCacheFileInStream extends FileInStream {
     long pageStart = pos - (pos % mPageSize);
     FileInStream stream = getExternalFileInStream(pageStart);
     int pageSize = (int) Math.min(mPageSize, mStatus.getLength() - pageStart);
-    byte[] page = new byte[pageSize];
+    byte[] page;
+    if (pageSize == mPageSize) {
+      page = mExternalPageBuffer;
+    } else {
+      page = new byte[pageSize];
+    }
     int totalBytesRead = 0;
     while (totalBytesRead < pageSize) {
       int bytesRead = stream.read(page, totalBytesRead, pageSize - totalBytesRead);
