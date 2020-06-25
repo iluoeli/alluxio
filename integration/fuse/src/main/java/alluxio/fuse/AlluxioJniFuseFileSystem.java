@@ -68,6 +68,9 @@ public final class AlluxioJniFuseFileSystem extends AbstractFuseFileSystem {
   // Keeps a cache of the most recently translated paths from String to Alluxio URI
   private final LoadingCache<String, AlluxioURI> mPathResolverCache;
   private final AtomicLong mNextOpenFileId = new AtomicLong(0);
+  private final AtomicLong mOpenOps = new AtomicLong(0);
+  private final AtomicLong mReleaseOps = new AtomicLong(0);
+  private final AtomicLong mReadOps = new AtomicLong(0);
   private final String mFsName;
 
   private static final int LOCK_SIZE = 2048;
@@ -193,7 +196,7 @@ public final class AlluxioJniFuseFileSystem extends AbstractFuseFileSystem {
       FileInStream is = mFileSystem.openFile(uri);
       mOpenFiles.put(fd, new OpenFileEntry(path, is));
       fi.fh.set(fd);
-      if (fd % 100 == 1) {
+      if (mOpenOps.incrementAndGet() % 100 == 1) {
         LOG.info("open(fd={},entries={})", fd, mOpenFiles.size());
       }
       return 0;
@@ -205,13 +208,8 @@ public final class AlluxioJniFuseFileSystem extends AbstractFuseFileSystem {
 
   @Override
   public int read(String path, ByteBuffer buf, long size, long offset, FuseFileInfo fi) {
-//    StatsAccumulator sa = mFileSystem.getFileSystemContext().getSeekStats();
-//    if (sa.count() > 2 && (sa.count() % 100 == 1)) {
-//      LOG.info("seek: count {}, mean {}, max {}, min {}, std {}",
-//          sa.count(), sa.mean(), sa.max(), sa.min(), sa.sampleVariance());
-//    }
-    StatsAccumulator cachesa = mFileSystem.getFileSystemContext().getCacheStats();
-    if (cachesa.count() > 2 && (cachesa.count() % 10000) == 1) {
+    if (mReadOps.incrementAndGet() % 10000 == 1) {
+      StatsAccumulator cachesa = mFileSystem.getFileSystemContext().getCacheStats();
       LOG.info("cache: count {}, hit {}, hit ratio {}",
           cachesa.count(), cachesa.sum(), cachesa.mean());
     }
@@ -258,7 +256,7 @@ public final class AlluxioJniFuseFileSystem extends AbstractFuseFileSystem {
   public int release(String path, FuseFileInfo fi) {
     final OpenFileEntry oe;
     long fd = fi.fh.get();
-    if (fd % 100 == 1) {
+    if (mReleaseOps.incrementAndGet() % 100 == 1) {
       LOG.info("release(fd={},entries={})", fd, mOpenFiles.size());
     }
     try (LockResource r1 = new LockResource(getFileLock(fd).writeLock())) {
