@@ -31,6 +31,11 @@ extern "C" {
 
 static struct fuse_operations jnifuse_oper;
 
+/*
+ * Class:     alluxio_jnifuse_LibFuse
+ * Method:    fuse_main_real
+ * Signature: (Lalluxio/jnifuse/AbstractFuseFileSystem;I[Ljava/lang/String;)I
+ */
 JNIEXPORT jint JNICALL Java_alluxio_jnifuse_LibFuse_fuse_1main_1real(
     JNIEnv *env, jobject libfuseobj, jobject obj, jint jargc,
     jobjectArray jargv) {
@@ -62,6 +67,18 @@ JNIEXPORT jint JNICALL Java_alluxio_jnifuse_LibFuse_fuse_1main_1real(
                            sizeof(struct fuse_operations), NULL);
   free(argv);
   return ret;
+}
+
+/*
+ * Class:     alluxio_jnifuse_LibFuse
+ * Method:    fuse_get_context
+ * Signature: ()Ljava/nio/ByteBuffer;
+ */
+jobject JNICALL Java_alluxio_jnifuse_LibFuse_fuse_1get_1context
+        (JNIEnv *env, jobject obj) {
+  struct fuse_context *ctx = fuse_get_context();
+  jobject buffer = env->NewDirectByteBuffer((void *)ctx, sizeof(struct fuse_context));
+  return ctx;
 }
 
 jint JNICALL Java_alluxio_jnifuse_FuseFillDir_fill(JNIEnv *env, jobject obj,

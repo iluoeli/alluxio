@@ -12,6 +12,7 @@
 package alluxio.jnifuse;
 
 import alluxio.jnifuse.struct.FileStat;
+import alluxio.jnifuse.struct.FuseContext;
 import alluxio.jnifuse.struct.FuseFileInfo;
 import alluxio.jnifuse.struct.Statvfs;
 import alluxio.jnifuse.utils.SecurityUtils;
@@ -106,6 +107,11 @@ public abstract class AbstractFuseFileSystem implements FuseFileSystem {
 
   private int execMount(String[] arg) {
     return libFuse.fuse_main_real(this, arg.length, arg);
+  }
+
+  @Override
+  public FuseContext getContext() {
+    return FuseContext.wrap(libFuse.fuse_get_context());
   }
 
   public void umount() {

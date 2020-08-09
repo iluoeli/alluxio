@@ -13,15 +13,20 @@ package alluxio.jnifuse.struct;
 
 import java.nio.ByteBuffer;
 
-// TODO(iluoeli): Add more fields
 public class FuseContext extends Struct {
 
+  public final Unsigned64 fuse = new Unsigned64();
   public final Unsigned32 uid = new Unsigned32();
   public final Unsigned32 gid = new Unsigned32();
+  public final Signed32 pid = new Signed32();
+  public final Unsigned64 private_data = new Unsigned64();
+  public final Unsigned16 umask = new Unsigned16();
 
   public FuseContext(ByteBuffer buffer) {
     super(buffer);
   }
 
-
+  public static FuseContext wrap(ByteBuffer buf) {
+    return new FuseContext(buf);
+  }
 }
