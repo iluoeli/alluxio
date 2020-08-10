@@ -75,10 +75,10 @@ JNIEXPORT jint JNICALL Java_alluxio_jnifuse_LibFuse_fuse_1main_1real(
  * Signature: ()Ljava/nio/ByteBuffer;
  */
 jobject JNICALL Java_alluxio_jnifuse_LibFuse_fuse_1get_1context
-        (JNIEnv *env, jobject obj) {
+  (JNIEnv *env, jobject obj) {
   struct fuse_context *ctx = fuse_get_context();
   jobject buffer = env->NewDirectByteBuffer((void *)ctx, sizeof(struct fuse_context));
-  return ctx;
+  return buffer;
 }
 
 jint JNICALL Java_alluxio_jnifuse_FuseFillDir_fill(JNIEnv *env, jobject obj,
