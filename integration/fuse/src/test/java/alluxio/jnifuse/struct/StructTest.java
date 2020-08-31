@@ -34,16 +34,16 @@ public class StructTest {
   static class DummyJniStruct extends Struct {
     public DummyJniStruct() {
       super(ByteBuffer.allocate(1));
-      m_signed32 = new Signed32();
+      m_int32T = new Signed32();
       m_long = new UnsignedLong();
       m_padding = new Padding(4);
-      m_int64 = new u_int64_t();
+      m_int64 = new Unsigned64();
     }
 
-    public final Signed32 m_signed32;
+    public final Signed32 m_int32T;
     public final UnsignedLong m_long;
     public final Padding m_padding;
-    public final u_int64_t m_int64;
+    public final Unsigned64 m_int64;
   }
 
   static class DummyJnrStruct extends jnr.ffi.Struct {
@@ -64,7 +64,7 @@ public class StructTest {
   public void offset() {
     DummyJniStruct st = new DummyJniStruct();
     DummyJnrStruct jnrst = new DummyJnrStruct(Runtime.getSystemRuntime());
-    assertEquals(jnrst.m_signed32.offset(), st.m_signed32.offset());
+    assertEquals(jnrst.m_signed32.offset(), st.m_int32T.offset());
     assertEquals(jnrst.m_long.offset(), st.m_long.offset());
     // FIXME(iluoeli): ensure alignment consistency
     // assertEquals(jnrst.m_int64.offset(), st.m_int64.offset());
