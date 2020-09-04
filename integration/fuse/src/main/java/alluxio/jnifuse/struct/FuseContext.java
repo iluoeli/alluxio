@@ -16,12 +16,18 @@ import java.nio.ByteBuffer;
 // TODO(iluoeli): Add more fields
 public class FuseContext extends Struct {
 
-  public final Unsigned32 uid = new Unsigned32();
-  public final Unsigned32 gid = new Unsigned32();
+  public final UnsignedLong fuse = new UnsignedLong();
+  public final uid_t uid = new uid_t();
+  public final gid_t gid = new gid_t();
+  public final pid_t pid = new pid_t();
+  public final UnsignedLong private_data = new UnsignedLong();
+  public final mode_t umask = new mode_t();
 
   public FuseContext(ByteBuffer buffer) {
     super(buffer);
   }
 
-
+  public FuseContext warp(ByteBuffer buffer) {
+    return new FuseContext(buffer);
+  }
 }
