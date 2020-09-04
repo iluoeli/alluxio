@@ -17,20 +17,20 @@ public class FuseFileInfo extends Struct {
 
   public FuseFileInfo(ByteBuffer buffer) {
     super(buffer);
-    flags = new Signed32();
+    flags = new u_int32_t();
     fh_old = new UnsignedLong();
-    writepage = new Signed32();
+    writepage = new u_int32_t();
     pad1 = new Padding(2);
-    fh = new Unsigned64();
-    lock_owner = new Unsigned64();
+    fh = new u_int64_t();
+    lock_owner = new u_int64_t();
   }
 
-  public final Signed32 flags;
+  public final u_int32_t flags;
   public final UnsignedLong fh_old;
-  public final Signed32 writepage;
+  public final u_int32_t writepage;
   public final Padding pad1;
-  public final Unsigned64 fh;
-  public final Unsigned64 lock_owner;
+  public final u_int64_t fh;
+  public final u_int64_t lock_owner;
 
   public static FuseFileInfo wrap(ByteBuffer buffer) {
     return new FuseFileInfo(buffer);
