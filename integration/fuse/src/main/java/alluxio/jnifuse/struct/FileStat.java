@@ -72,40 +72,39 @@ public class FileStat extends Struct {
   public FileStat(ByteBuffer buffer) {
     super(buffer);
     if (OSUtils.isMacOS()) {
-      st_dev = new Unsigned64();
-      st_mode = new Unsigned32();
-      st_nlink = new Unsigned64();
-      st_ino = new Unsigned64();
-      st_uid = new Unsigned32();
-      st_gid = new Unsigned32();
-      st_rdev = new Unsigned64();
+      st_dev = new dev_t();
+      st_mode = new mode_t();
+      st_nlink = new nlink_t();
+      st_ino = new ino_t();
+      st_uid = new uid_t();
+      st_gid = new gid_t();
+      st_rdev = new dev_t();
       st_atim = new Timespec();
       st_mtim = new Timespec();
       st_ctim = new Timespec();
       st_birthtime = new Timespec();
-      st_size = new SignedLong();
-      st_blocks = new SignedLong();
-      st_blksize = new SignedLong();
-      st_flags = new Unsigned32();
-      st_gen = new Unsigned32();
+      st_size = new off_t();
+      st_blocks = new blkcnt_t();
+      st_blksize = new blksize_t();
+      st_flags = new u_int32_t();
+      st_gen = new u_int32_t();
       new Signed32();
       new Signed64();
       new Signed64();
-
       pad1 = null;
     } else {
       // Linux platform
-      st_dev = new Unsigned64();
+      st_dev = new dev_t();
       pad1 = null;
-      st_ino = new Unsigned64();
-      st_nlink = new Unsigned64();
-      st_mode = new Unsigned32();
-      st_uid = new Unsigned32();
-      st_gid = new Unsigned32();
-      st_rdev = new Unsigned64();
-      st_size = new SignedLong();
-      st_blksize = new SignedLong();
-      st_blocks = new SignedLong();
+      st_ino = new ino_t();
+      st_nlink = new nlink_t();
+      st_mode = new mode_t();
+      st_uid = new uid_t();
+      st_gid = new gid_t();
+      st_rdev = new dev_t();
+      st_size = new off_t();
+      st_blksize = new blksize_t();
+      st_blocks = new blkcnt_t();
       st_atim = new Timespec();
       st_mtim = new Timespec();
       st_ctim = new Timespec();
@@ -116,25 +115,25 @@ public class FileStat extends Struct {
     }
   }
 
-  public final Unsigned64 st_dev;
+  public final dev_t st_dev;
   public final Unsigned16 pad1;
-  public final Unsigned64 st_ino;
-  public final Unsigned64 st_nlink;
-  public final Unsigned32 st_mode;
-  public final Unsigned32 st_uid;
-  public final Unsigned32 st_gid;
-  public final Unsigned64 st_rdev;
-  public final SignedLong st_size;
-  public final SignedLong st_blksize;
-  public final SignedLong st_blocks;
+  public final ino_t st_ino;
+  public final nlink_t st_nlink;
+  public final mode_t st_mode;
+  public final uid_t st_uid;
+  public final gid_t st_gid;
+  public final dev_t st_rdev;
+  public final off_t st_size;
+  public final blksize_t st_blksize;
+  public final blkcnt_t st_blocks;
   public final Timespec st_atim;
   public final Timespec st_mtim;
   public final Timespec st_ctim;
   public final Timespec st_birthtime;
 
   /** MacOS specific */
-  public final Unsigned32 st_flags;
-  public final Unsigned32 st_gen;
+  public final u_int32_t st_flags;
+  public final u_int32_t st_gen;
 
   public static FileStat wrap(ByteBuffer buffer) {
     return new FileStat(buffer);

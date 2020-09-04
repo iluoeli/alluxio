@@ -26,7 +26,6 @@ public class FileStatTest {
     FileStat jnistat = new FileStat(ByteBuffer.allocate(256));
     ru.serce.jnrfuse.struct.FileStat jnrstat =
         new ru.serce.jnrfuse.struct.FileStat(Runtime.getSystemRuntime());
-
     assertEquals(jnrstat.st_dev.offset(), jnistat.st_dev.offset());
     assertEquals(jnrstat.st_ino.offset(), jnistat.st_ino.offset());
     assertEquals(jnrstat.st_nlink.offset(), jnistat.st_nlink.offset());
@@ -48,15 +47,35 @@ public class FileStatTest {
   @Test
   public void dataConsistency() {
     FileStat stat = new FileStat(ByteBuffer.allocateDirect(256));
+    int dev = 0x1234;
+    int ino = 0x1335;
+    int nlink = 0x1436;
     int mode = FileStat.ALL_READ | FileStat.ALL_WRITE | FileStat.S_IFDIR;
-    long size = 0x123456789888721L;
+    int uid = 1000;
+    int gid = 1000;
+    int rdev = 0x1537;
+    long size = 0x123456789abcdef0L;
+    int blksize = 0x1638;
+    int blks = 0x1739;
+    stat.st_dev.set(dev);
+    stat.st_ino.set(ino);
+    stat.st_nlink.set(nlink);
     stat.st_mode.set(mode);
+    stat.st_uid.set(uid);
+    stat.st_gid.set(gid);
+    stat.st_rdev.set(rdev);
     stat.st_size.set(size);
+    stat.st_blksize.set(blksize);
+    stat.st_blocks.set(blks);
+    assertEquals(dev, stat.st_dev.get());
+    assertEquals(ino, stat.st_ino.get());
+    assertEquals(nlink, stat.st_nlink.get());
     assertEquals(mode, stat.st_mode.get());
+    assertEquals(uid, stat.st_uid.get());
+    assertEquals(gid, stat.st_gid.get());
+    assertEquals(rdev, stat.st_rdev.get());
     assertEquals(size, stat.st_size.get());
-
-    ByteBuffer buf = stat.buffer;
-    assertEquals(mode, buf.getInt(0x18));
-    assertEquals(size, buf.getLong(0x30));
+    assertEquals(blksize, stat.st_blksize.get());
+    assertEquals(blks, stat.st_blocks.get());
   }
 }
