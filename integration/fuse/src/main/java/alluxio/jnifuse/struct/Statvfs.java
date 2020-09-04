@@ -32,12 +32,12 @@ public class Statvfs extends Struct {
     super(buffer);
     f_bsize = new UnsignedLong();
     f_frsize = new UnsignedLong();
-    f_blocks = new UnsignedLong();
-    f_bfree = new UnsignedLong();
-    f_bavail = new UnsignedLong();
-    f_files = new UnsignedLong();
-    f_ffree = new UnsignedLong();
-    f_favail = new UnsignedLong();
+    f_blocks = new fsblkcnt_t();
+    f_bfree = new fsblkcnt_t();
+    f_bavail = new fsblkcnt_t();
+    f_files = new fsblkcnt_t();
+    f_ffree = new fsblkcnt_t();
+    f_favail = new fsblkcnt_t();
     f_fsid = new UnsignedLong();
     f_unused = null;
     f_flag = new UnsignedLong();
@@ -46,14 +46,14 @@ public class Statvfs extends Struct {
 
   public final UnsignedLong f_bsize;
   public final UnsignedLong f_frsize;
-  public final UnsignedLong f_blocks;
-  public final UnsignedLong f_bfree;
-  public final UnsignedLong f_bavail;
-  public final UnsignedLong f_files;
-  public final UnsignedLong f_ffree;
-  public final UnsignedLong f_favail;
+  public final fsblkcnt_t f_blocks;
+  public final fsblkcnt_t f_bfree;
+  public final fsblkcnt_t f_bavail;
+  public final fsblkcnt_t f_files;
+  public final fsblkcnt_t f_ffree;
+  public final fsblkcnt_t f_favail;
   public final UnsignedLong f_fsid;
-  public final Signed32 f_unused;
+  public final u_int32_t f_unused;
   public final UnsignedLong f_flag;
   public final UnsignedLong f_namemax;
   // __f_spare
