@@ -158,6 +158,7 @@ public final class CacheClient {
     FileCacheContext.INSTANCE.addLocalFileCache("/dev/shm/test", in);
     File f = new File("/dev/shm/test");
     */
+//    MappedCacheEntity entity = new MappedCacheEntity(1, "/dev/shm/test", 10  *1024 * 1024);
     MappedCacheEntity entity = new MappedCacheEntity(1, "/dev/shm/test", 10  *1024 * 1024);
     FileCacheContext.INSTANCE.addCache(1, entity);
     CacheFileInputStream in1 = new CacheFileInputStream(1);
@@ -175,6 +176,7 @@ public final class CacheClient {
 
   public static void main(String[] arg) throws Exception{
     CacheClient cacheClient = new CacheClient();
+//    cacheClient.writeIntoRamFsTest();
      cacheClient.testRead();
     System.out.println("===============finish===============");
   }

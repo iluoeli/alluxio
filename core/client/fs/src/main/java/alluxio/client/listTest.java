@@ -1,7 +1,7 @@
 package alluxio.client;
 
 import alluxio.collections.ConcurrentHashSet;
-import sun.misc.Cache;
+//import sun.misc.Cache;
 
 import java.util.LinkedList;
 import java.util.Map;

@@ -6,6 +6,6 @@ public enum HitRatioMetric {
   public long accessSize;
 
   public double getHitRatio() {
-    return hitSize / accessSize;
+    return (double)hitSize / accessSize;
   }
 }

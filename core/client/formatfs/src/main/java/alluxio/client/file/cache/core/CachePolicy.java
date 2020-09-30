@@ -1,13 +1,13 @@
 package alluxio.client.file.cache.core;
 
 import alluxio.client.file.cache.submodularLib.LRUPolicy;
-import alluxio.client.file.cache.submodularLib.cacheSet.DivideGR;
 import alluxio.client.file.cache.submodularLib.TraditionalLFUEvictor;
 import alluxio.client.file.cache.submodularLib.TraditionalLRUEvictor;
+import alluxio.client.file.cache.submodularLib.cacheSet.DivideGR;
 
 public interface CachePolicy {
   enum PolicyName {
-    LRU, ISK, GR, DIVIDE_GR,TRADITIONAL_LFU, TRADITIONAL_LRU
+    LRU, ISK, GR, DIVIDE_GR, TRADITIONAL_LFU, TRADITIONAL_LRU
   }
 
   class factory {
@@ -35,6 +35,7 @@ public interface CachePolicy {
           break;
         case TRADITIONAL_LRU:
           policy = new TraditionalLRUEvictor();
+          break;
         default:
           break;
       }
@@ -55,4 +56,6 @@ public interface CachePolicy {
   public void clear();
 
   public PolicyName getPolicyName();
+
+  public boolean isFixedLength();
 }

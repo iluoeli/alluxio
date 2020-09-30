@@ -14,11 +14,13 @@ package alluxio.client.file.cache.core;
 import alluxio.client.file.FileInStream;
 import alluxio.client.file.FileSystemContext;
 import alluxio.client.file.URIStatus;
+import alluxio.client.file.cache.Metric.HitRatioMetric;
 import alluxio.client.file.options.InStreamOptions;
 import alluxio.exception.PreconditionMessage;
 import com.google.common.base.Preconditions;
 
 import java.io.IOException;
+import java.util.Iterator;
 
 import static alluxio.client.file.cache.core.ClientCacheContext.*;
 
@@ -84,11 +86,29 @@ public class FileInStreamWithCache extends FileInStream {
     }
     if (mLockManager.evictCheck()) {
       try {
+        if (mCachePolicy.isFixedLength()) {
+          // take a note of real pos and len, to calculate hit size properly
+          FixLengthReadNote.takeNote(pos, len);
+        }
         LockTask task = ClientCacheContext.INSTANCE.getLockTask(mFileId);
         ClientCacheContext.readTask = task;
 
-        CacheUnit unit = mCacheContext.getCache(mFileId, mLength, pos, Math.min(pos + len,
-          mLength), task);
+        CacheUnit unit;
+        long beginForFixLength = 0;
+        long endForFixLength = 0;
+        if (mCachePolicy.isFixedLength()) {
+          beginForFixLength = pos / CACHE_SIZE * CACHE_SIZE;
+          long endInd = (pos + len)/ CACHE_SIZE;
+          if ((pos + len) % CACHE_SIZE != 0) {
+            endInd ++;
+          }
+          endForFixLength = endInd * CACHE_SIZE;
+          unit = mCacheContext.getCache(mFileId, mLength, beginForFixLength, Math.min(endForFixLength,
+                  mLength), task);
+        } else {
+          unit = mCacheContext.getCache(mFileId, mLength, pos, Math.min(pos + len,
+                  mLength), task);
+        }
         unit.setLockTask(task);
         if (unit.isFinish()) {
           ClientCacheContext.allHitTime ++;
@@ -102,13 +122,29 @@ public class FileInStreamWithCache extends FileInStream {
         } else {
           TempCacheUnit tmpUnit = (TempCacheUnit) unit;
           tmpUnit.setInStream(this);
-          res = mCachePolicy.read(tmpUnit, b, off, len, pos, mCacheContext.isAllowCache());
+          if (mCachePolicy.isFixedLength()) {
+            byte[]cachedBuf = new byte[(int)(endForFixLength-beginForFixLength)];
+            long preAccessSize = HitRatioMetric.INSTANCE.accessSize;
+            res = mCachePolicy.read(tmpUnit, cachedBuf, off, (int)(endForFixLength-beginForFixLength), beginForFixLength, mCacheContext.isAllowCache());
+
+            if (res != -1) {
+              for(int i = 0; i < len; i ++) {
+                b[i] = cachedBuf[(int) (pos - beginForFixLength) + i];
+              }
+//              b = Arrays.copyOfRange(cachedBuf, (int) (pos - beginForFixLength), len);
+              res = len;
+              HitRatioMetric.INSTANCE.accessSize = preAccessSize + res;
+            }
+          } else {
+            res = mCachePolicy.read(tmpUnit, b, off, len, pos, mCacheContext.isAllowCache());
+          }
           if (res != len) {
             // the end of file
             tmpUnit.resetEnd((int) mLength);
           }
         }
       } finally {
+        FixLengthReadNote.discardNote();
         mLockManager.evictReadUnlock();
       }
     } else {
@@ -131,7 +167,7 @@ public class FileInStreamWithCache extends FileInStream {
   /**
    * sequential reading from file, no data coincidence in  reading process;
    * cached data after reading first time;
-   * used by test sequential reading.
+   * used by mt sequential reading.
    */
   public int sequentialReading(byte[] b, int off, int len) throws IOException {
     Preconditions.checkArgument(b != null, PreconditionMessage.ERR_READ_BUFFER_NULL);

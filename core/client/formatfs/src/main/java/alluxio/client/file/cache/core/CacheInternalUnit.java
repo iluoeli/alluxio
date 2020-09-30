@@ -198,6 +198,7 @@ public class CacheInternalUnit extends LinkNode<CacheInternalUnit> implements Ca
     }
 
     int leftToRead = (int) Math.min(mEnd - begin, len);
+    int hitLen = 0;
     int readedLen = 0;
     // skip the first bytebuf reduntant byte len;
     if (begin > newBegin) {
@@ -205,9 +206,15 @@ public class CacheInternalUnit extends LinkNode<CacheInternalUnit> implements Ca
       int readLen = Math.min(currentLeftCanReadLen, leftToRead);
       current.getBytes((int) (begin - newBegin), b, off, readLen);
       leftToRead -= readLen;
+      if (FixLengthReadNote.isIsUsingNote()) {
+        hitLen += FixLengthReadNote.realHitLen(begin, readLen);
+      } else {
+        hitLen += readLen;
+      }
       readedLen += readLen;
       if (iter.hasNext()) {
         current = iter.next();
+        newBegin += current.capacity();
       }
     }
 
@@ -215,14 +222,22 @@ public class CacheInternalUnit extends LinkNode<CacheInternalUnit> implements Ca
       int readLen = Math.min(current.capacity(), leftToRead);
       current.getBytes(0, b, off + readedLen, readLen);
       leftToRead -= readLen;
+      if (FixLengthReadNote.isIsUsingNote()) {
+        hitLen += FixLengthReadNote.realHitLen(newBegin, readLen);
+      } else {
+        hitLen += readLen;
+      }
       readedLen += readLen;
       if (iter.hasNext()) {
         current = iter.next();
+        newBegin += current.capacity();
       } else {
         break;
       }
     }
-    HitRatioMetric.INSTANCE.hitSize += readedLen;
+
+
+    HitRatioMetric.INSTANCE.hitSize += hitLen;
     return readedLen;
   }
 

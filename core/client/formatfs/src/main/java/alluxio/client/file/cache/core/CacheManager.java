@@ -1,6 +1,7 @@
 package alluxio.client.file.cache.core;
 
 import alluxio.client.HitMetric;
+import alluxio.client.file.CacheParamSetter;
 import alluxio.client.file.cache.Metric.HitRatioMetric;
 
 import java.io.IOException;
@@ -11,6 +12,10 @@ public final class CacheManager {
   private PromotionPolicy promoter;
   private boolean isPromotion;
 
+  public boolean isFixedLength() {
+    return evictor.isFixedLength();
+  }
+
   public CacheManager(ClientCacheContext context) {
     mCacheContext = context;
     isPromotion = mCacheContext.isPromotion();
@@ -19,7 +24,8 @@ public final class CacheManager {
 
   public void setPolicy() {
     if (!isPromotion) {
-      evictor = CachePolicy.factory.create(CachePolicy.PolicyName.DIVIDE_GR);
+//      evictor = CachePolicy.factory.create(CachePolicy.PolicyName.ISK);
+        evictor = CachePolicy.factory.create(CacheParamSetter.POLICY_NAME);
       evictor.init(mCacheContext.getCacheLimit() + mCacheContext.CACHE_SIZE, mCacheContext);
     } else {
       promoter = new PromotionPolicy();
@@ -29,38 +35,33 @@ public final class CacheManager {
 
   public int read(TempCacheUnit unit, byte[] b, int off, int readlen, long pos, boolean isAllowCache) throws IOException {
     int res = -1;
-
     long begin = System.currentTimeMillis();
-
     res = unit.lazyRead(b, off, readlen, pos, isAllowCache);
-
     BaseCacheUnit unit1 = new BaseCacheUnit(unit.getFileId(), pos, pos + res);
     unit1.setCurrentHitVal(unit.getNewCacheSize());
     HitMetric.mMissSize += unit.getNewCacheSize();
-
     if (!isPromotion) {
       if (isAllowCache) {
         CacheInternalUnit resultUnit = mCacheContext.addCache(unit);
+        FileCacheUnit uu = mCacheContext.mFileIdToInternalList.get(unit.getFileId());
+        int i = uu.mBuckets.getIndex(resultUnit.getBegin(), resultUnit.getEnd());
+        uu.mBuckets.mCacheIndex0[i].test();
         evictor.fliter(resultUnit, unit1);
+        evictor.check(unit);
       } else {
         evictor.fliter(null, unit1);
       }
-      evictor.check(unit);
-
     } else {
-
       promoter.filter(unit1);
     }
     unit.getLockTask().unlockAll();
     testRead.tmpRead += System.currentTimeMillis() - begin;
     HitRatioMetric.INSTANCE.accessSize += readlen;
-
     return res;
   }
 
   public int read(CacheInternalUnit unit, byte[] b, int off, long pos, int len) {
     try {
-
       long begin = System.currentTimeMillis();
 
       int remaining = unit.positionedRead(b, off, pos, len);

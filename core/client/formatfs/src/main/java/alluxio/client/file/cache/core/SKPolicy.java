@@ -48,6 +48,10 @@ public enum SKPolicy implements CachePolicy, Runnable {
       mPolicyName = PolicyName.GR;
     }
   }
+  @Override
+  public boolean isFixedLength() {
+    return true;
+  }
 
   @Override
   public PolicyName getPolicyName() {

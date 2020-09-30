@@ -205,6 +205,11 @@ public class DivideGR extends LRUPolicy {
   }
 
   @Override
+  public boolean isFixedLength() {
+    return false;
+  }
+
+  @Override
   public synchronized void fliter(CacheInternalUnit unit, BaseCacheUnit current) {
     addReCompute(unit, current);
     unit.accessRecord.add(current);

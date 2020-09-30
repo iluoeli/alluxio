@@ -12,6 +12,7 @@
 package alluxio.client.file.cache.core;
 
 import alluxio.AlluxioURI;
+import alluxio.client.file.CacheParamSetter;
 import alluxio.client.file.URIStatus;
 import alluxio.client.file.cache.buffer.MemoryAllocator;
 import alluxio.client.file.cache.remote.grpc.service.Data;
@@ -25,7 +26,8 @@ import io.netty.buffer.ByteBuf;
 import io.netty.util.ReferenceCountUtil;
 
 import java.io.IOException;
-import java.util.*;
+import java.util.Iterator;
+import java.util.Queue;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -38,10 +40,13 @@ public class ClientCacheContext implements CacheContext {
   public static final ClientCacheContext UTILS = new ClientCacheContext(false);
   public static long mPromotionThreadId = 0;
   public static long fileId;
-  public static final int CACHE_SIZE = 1048576;
+//  public static final int CACHE_SIZE = 1048576;
+  public static int CACHE_SIZE = CacheParamSetter.CACHE_SIZE;
   public final int BUCKET_LENGTH = 10;
-  public static final String mCacheSpaceLimit = "1g";
-  private final long mCacheLimit = getSpaceLimit();
+//  public static final String mCacheSpaceLimit = "1g";
+  public static final String mCacheSpaceLimit = CacheParamSetter.mCacheSpaceLimit;
+//  private final long mCacheLimit = getSpaceLimit();
+  public static  long mCacheLimit = getSpaceLimit();
   public boolean REVERSE = true;
   public boolean USE_INDEX_0 = true;
   private static final CacheManager mCacheManager;
@@ -62,7 +67,8 @@ public class ClientCacheContext implements CacheContext {
   public static long checkout = 0;
   public static long missSize;
   public static long hitTime;
-  public final MODE mode = MODE.PROMOTE;
+//  public final MODE mode = MODE.EVICT;
+  public final MODE mode = CacheParamSetter.mode;
   public static boolean useMetedata = true;
   public long mUsedCacheSpace = 0;
   public double mHitvalue;
@@ -75,7 +81,7 @@ public class ClientCacheContext implements CacheContext {
     return COMPUTE_POOL;
   }
 
-  enum MODE {
+  public enum MODE {
     PROMOTE, EVICT
   }
 
@@ -369,7 +375,7 @@ public class ClientCacheContext implements CacheContext {
             return handleUnCoincidence(newUnit, current, current.after, bucketIndex, task);
           }
         } /*else if(begin == right){
-          //TODO delete this, only for test
+          //TODO delete this, only for mt
           CacheInternalUnit next = current.after;
           if(next == null)
           return handleUnCoincidence(newUnit, current, current.after);
@@ -501,7 +507,7 @@ public class ClientCacheContext implements CacheContext {
     return judgeIfOnlyOne(result);
   }
 
-  private void addReadOrWriteLocks(CacheInternalUnit current, int currentIndex,  LockTask task) {
+  private void addReadOrWriteLocks(CacheInternalUnit current, int currentIndex, LockTask task) {
     if (needWriteLock()) {
       mLockManager.writeLock( currentIndex, current.mBucketIndex, task);
     } else {

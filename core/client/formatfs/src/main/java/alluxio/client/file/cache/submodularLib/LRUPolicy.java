@@ -62,6 +62,10 @@ public class LRUPolicy implements CachePolicy {
     mNeedDelete = cachesize - limit;
     return evict();
   }
+  @Override
+  public boolean isFixedLength() {
+    return true;
+  }
 
   @Override
   public long evict() {
