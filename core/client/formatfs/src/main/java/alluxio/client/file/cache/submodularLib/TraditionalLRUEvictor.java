@@ -45,7 +45,7 @@ public class TraditionalLRUEvictor implements CachePolicy {
         long deleteSize = 0;
         while (size > limit) {
             //System.out.println(size / (1024  *1024));
-            pair p = visitMap.pollFirst();
+            pair p = visitMap.pollLast();
             s.remove(p);
             removeBlockFromCachaSpace(p.fileId, p.index);
 
@@ -147,9 +147,9 @@ public class TraditionalLRUEvictor implements CachePolicy {
             pair p = new pair(unit.getFileId(), i);
             if (s.contains(p)) {
                 visitMap.remove(p);
-                visitMap.addLast(p);
+                visitMap.addFirst(p);
             } else {
-                visitMap.addLast(p);
+                visitMap.addFirst(p);
                 s.add(p);
                 addIntoCacheSpace(p.fileId, p.index);
             }
