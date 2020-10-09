@@ -50,7 +50,7 @@ public enum SKPolicy implements CachePolicy, Runnable {
   }
   @Override
   public boolean isFixedLength() {
-    return true;
+    return false;
   }
 
   @Override
