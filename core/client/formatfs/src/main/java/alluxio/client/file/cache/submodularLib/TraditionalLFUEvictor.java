@@ -2,13 +2,16 @@ package alluxio.client.file.cache.submodularLib;
 
 import alluxio.client.file.CacheParamSetter;
 import alluxio.client.file.cache.core.*;
+import alluxio.collections.Pair;
 import org.apache.commons.lang3.RandomUtils;
 
 import java.util.*;
 
 public class TraditionalLFUEvictor implements CachePolicy {
     public PriorityQueue<TempCacheUnit> mVisitQueue;
-    private Map<Long, Map<Integer, Integer>> visitMap = new HashMap<>();
+    private Map<Long, Map<Integer, KeyWithPriority>> visitMap = new HashMap<>();
+    private PriorityQueue<KeyWithPriority> pq = new PriorityQueue<>();
+    private long now = 0;
 //    public long blockSize = (long) (1024 * 1024 * 2 );
     public long blockSize = CacheParamSetter.CACHE_SIZE;
     private double mVisitSize = 0;
@@ -93,24 +96,31 @@ public class TraditionalLFUEvictor implements CachePolicy {
         long delete = 0;
         while (size > limit) {
             // System.out.println(size / (1024  *1024));
-            int minT = -1;
-            long minFileId = -1;
-            int min = Integer.MAX_VALUE;
-            for (long l : visitMap.keySet()) {
-                for (int i : visitMap.get(l).keySet()) {
-                    if (visitMap.get(l).get(i) < min) {
-                        minT = i;
-                        min = visitMap.get(l).get(i);
-                        minFileId = l;
-                    }
+//            int minT = -1;
+//            long minFileId = -1;
+//            int min = Integer.MAX_VALUE;
+//            for (long l : visitMap.keySet()) {
+//                for (int i : visitMap.get(l).keySet()) {
+//                    if (visitMap.get(l).get(i) < min) {
+//                        minT = i;
+//                        min = visitMap.get(l).get(i);
+//                        minFileId = l;
+//                    }
+//                }
+//            }
+            KeyWithPriority kp = pq.poll();
+            if (kp == null) {
+                System.out.println("pq should not be null");
+            } else {
+                long minFileId = kp.fd;
+                int minT = kp.id;
+                if (visitMap.containsKey(minFileId)) {
+                    visitMap.get(minFileId).remove(minT);
+                    delete += blockSize;
+                    blockNum --;
+                    size = blockNum * blockSize;
+                    removeBlockFromCachaSpace(minFileId, minT);
                 }
-            }
-            if (visitMap.containsKey(minFileId)) {
-                visitMap.get(minFileId).remove(minT);
-                delete += blockSize;
-                blockNum --;
-                size = blockNum * blockSize;
-                removeBlockFromCachaSpace(minFileId, minT);
             }
         }
         return delete;
@@ -128,9 +138,16 @@ public class TraditionalLFUEvictor implements CachePolicy {
             visitMap.put(fileId, new HashMap<>());
         }
         if (visitMap.get(fileId).containsKey(i)) {
-            visitMap.get(fileId).put(i, visitMap.get(fileId).get(i) + 1);
+            KeyWithPriority kp = visitMap.get(fileId).get(i);
+            pq.remove(kp);
+            kp.hits++;
+            kp.timestamp = now++;
+            pq.offer(kp);
+//            visitMap.get(fileId).put(i, kp);
         } else {
-            visitMap.get(fileId).put(i, 1);
+            KeyWithPriority kp = new KeyWithPriority(i, fileId,0, now++);
+            visitMap.get(fileId).put(i, kp);
+            pq.offer(kp);
 
             mPromoteSize += blockSize;
         }
@@ -246,5 +263,43 @@ public class TraditionalLFUEvictor implements CachePolicy {
         test.testVisit();
         test.mVisitSize = test.mHitSize = 0;
         test.testVisit();
+    }
+
+    static class KeyWithPriority implements Comparable<KeyWithPriority> {
+        long hits;
+        long timestamp;
+        int id;
+        long fd;
+
+        public KeyWithPriority(int id, long fd, long hits, long timestamp) {
+            this.id = id;
+            this.fd = fd;
+            this.hits = hits;
+            this.timestamp = timestamp;
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) return true;
+            if (o == null || getClass() != o.getClass()) return false;
+            KeyWithPriority that = (KeyWithPriority) o;
+            return hits == that.hits &&
+                    timestamp == that.timestamp &&
+                    id == that.id &&
+                    fd == that.id;
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(hits, timestamp, id, fd);
+        }
+
+        @Override
+        public int compareTo(KeyWithPriority other) {
+            if (this.hits == other.hits) {
+                return (int) (this.timestamp - other.timestamp);
+            }
+            return (int) (this.hits - other.hits);
+        }
     }
 }
