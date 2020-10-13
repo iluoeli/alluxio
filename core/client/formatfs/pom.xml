@@ -30,7 +30,11 @@
     </properties>
 
     <dependencies>
-
+        <dependency>
+            <groupId>com.github.pasa</groupId>
+            <artifactId>cache-algo</artifactId>
+            <version>1.0-SNAPSHOT</version>
+        </dependency>
         <!-- https://mvnrepository.com/artifact/org.apache.parquet/parquet-common -->
         <dependency>
             <groupId>org.apache.parquet</groupId>
