@@ -72,10 +72,6 @@ public class ARCEvictor implements CachePolicy {
         List<Integer> tmp = getInvolvedBlock(unit.getBegin(), unit.getEnd());
 
         for (int i : tmp) {
-            if (i == 3470) {
-                System.out.printf("unit(%d, %d)\n", unit.getBegin(), unit.getEnd());
-                System.out.println(innerCache.isCached(new Pair(unit.getFileId(), i)));
-            }
             Pair p = new Pair(unit.getFileId(), i);
             if (innerCache.isCached(p)) {
                 innerCache.get(p);
