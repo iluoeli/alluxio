@@ -3041,6 +3041,13 @@ public final class PropertyKey implements Comparable<PropertyKey> {
           .setConsistencyCheckLevel(ConsistencyCheckLevel.WARN)
           .setScope(Scope.WORKER)
           .build();
+  public static final PropertyKey USER_CLIENT_CACHE_ENABLED =
+          new Builder("alluxio.user.clientcache.enabled")
+                  .setDefaultValue(false)
+                  .setDescription("Whether to enable client-side caching on client.")
+                  .setConsistencyCheckLevel(ConsistencyCheckLevel.WARN)
+                  .setScope(Scope.CLIENT)
+                  .build();
 
   /**
    * @param fullyQualifiedClassname a fully qualified classname

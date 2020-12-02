@@ -12,6 +12,8 @@
 package alluxio.client.file;
 
 import alluxio.AlluxioURI;
+import alluxio.Configuration;
+import alluxio.PropertyKey;
 import alluxio.client.file.cache.core.ClientCacheContext;
 import alluxio.client.file.cache.core.FileInStreamWithCache;
 import alluxio.client.file.cache.core.MetedataCache;
@@ -40,6 +42,16 @@ public class CacheFileSystem extends BaseFileSystem {
       return get(FileSystemContext.get(), ClientCacheContext.INSTANCE);
     } else {
       return  FileSystem.Factory.get(FileSystemContext.get());
+    }
+  }
+
+  public static FileSystem get() {
+    if (Configuration.getBoolean(PropertyKey.USER_CLIENT_CACHE_ENABLED)) {
+      System.out.println("client-side caching enabled");
+      return get(true);
+    } else {
+      System.out.println("client-side caching disabled");
+      return get(false);
     }
   }
 

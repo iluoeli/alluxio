@@ -83,6 +83,13 @@ public interface FileSystem {
           LOG.debug("{}={} ({})", key.getName(), value, source);
         }
       }
+      if (Configuration.getBoolean(PropertyKey.USER_CLIENT_CACHE_ENABLED)) {
+        LOG.warn("client-side caching enabled");
+        System.out.println("client-side caching enabled");
+      } else {
+        LOG.warn("client-side caching disabled");
+        System.out.println("client-side caching disabled");
+      }
       return BaseFileSystem.get(context);
     }
   }
