@@ -20,10 +20,9 @@ import alluxio.Configuration;
 import alluxio.PropertyKey;
 import alluxio.client.block.AlluxioBlockStore;
 import alluxio.client.block.BlockWorkerInfo;
-import alluxio.client.file.FileOutStream;
+import alluxio.client.file.*;
 import alluxio.client.file.FileSystem;
-import alluxio.client.file.FileSystemContext;
-import alluxio.client.file.URIStatus;
+import alluxio.client.file.cache.core.ClientCacheContext;
 import alluxio.client.file.options.CreateDirectoryOptions;
 import alluxio.client.file.options.CreateFileOptions;
 import alluxio.client.file.options.DeleteOptions;
@@ -476,7 +475,8 @@ abstract class AbstractFileSystem extends org.apache.hadoop.fs.FileSystem {
       }
       // Must happen inside the lock so that the global filesystem context isn't changed by a
       // concurrent call to initialize.
-      updateFileSystemAndContext();
+//      updateFileSystemAndContext();
+      updateCacheFileSystemAndContext();
       sInitialized = true;
     }
   }
@@ -569,6 +569,19 @@ abstract class AbstractFileSystem extends org.apache.hadoop.fs.FileSystem {
       mFileSystem = FileSystem.Factory.get(mContext);
     }
   }
+  private void updateCacheFileSystemAndContext() {
+    Subject subject = getHadoopSubject();
+    if (subject != null) {
+      LOG.debug("Using Hadoop subject: {}", subject);
+      mContext = FileSystemContext.get(subject);
+      mFileSystem = CacheFileSystem.get(mContext, ClientCacheContext.INSTANCE);
+    } else {
+      LOG.debug("No Hadoop subject. Using FileSystem Context without subject.");
+      mContext = FileSystemContext.get();
+      mFileSystem = mFileSystem = CacheFileSystem.get(mContext, ClientCacheContext.INSTANCE);;
+    }
+  }
+
 
   /**
    * @return the hadoop subject if exists, null if not exist

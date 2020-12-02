@@ -17,7 +17,6 @@ import com.google.common.base.Preconditions;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.Channel;
-import org.apache.hadoop.yarn.webapp.hamlet.Hamlet;
 
 
 import java.io.IOException;

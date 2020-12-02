@@ -60,6 +60,12 @@
       <type>test-jar</type>
       <scope>test</scope>
     </dependency>
+      <dependency>
+          <groupId>org.alluxio</groupId>
+          <artifactId>formatfs</artifactId>
+          <version>1.9.0-SNAPSHOT</version>
+          <scope>compile</scope>
+      </dependency>
   </dependencies>
 
   <profiles>
