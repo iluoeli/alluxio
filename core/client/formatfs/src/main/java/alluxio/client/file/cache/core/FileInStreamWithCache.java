@@ -53,18 +53,23 @@ public class FileInStreamWithCache extends FileInStream {
   }
 
   public int innerRead(byte[] b, int off, int len) throws IOException {
+    long st = System.currentTimeMillis();
     int res = super.read(b, off, len);
     if (res > 0) mPosition += res;
-
+    HitRatioMetric.INSTANCE.ReadUFSTimeCost += (System.currentTimeMillis() - st);
+    HitRatioMetric.INSTANCE.ReadUFSCount.incrementAndGet();
     return res;
   }
 
   public int innerPositionRead(long pos, byte[] b, int off, int len) throws IOException {
+    long st = System.currentTimeMillis();
     long  b1 = System.currentTimeMillis();
     int res = super.positionedRead(pos, b, off, len);
     missSize += res;
     missTime ++;
     testRead.actualRead += System.currentTimeMillis() - b1;
+    HitRatioMetric.INSTANCE.ReadUFSTimeCost += (System.currentTimeMillis() - st);
+    HitRatioMetric.INSTANCE.ReadUFSCount.incrementAndGet();
     return res;
   }
 

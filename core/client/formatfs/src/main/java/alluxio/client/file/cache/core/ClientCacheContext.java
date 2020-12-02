@@ -14,6 +14,7 @@ package alluxio.client.file.cache.core;
 import alluxio.AlluxioURI;
 import alluxio.client.file.CacheParamSetter;
 import alluxio.client.file.URIStatus;
+import alluxio.client.file.cache.Metric.HitRatioMetric;
 import alluxio.client.file.cache.buffer.MemoryAllocator;
 import alluxio.client.file.cache.remote.grpc.service.Data;
 import alluxio.client.file.cache.struct.DoubleLinkedList;
@@ -246,18 +247,25 @@ public class ClientCacheContext implements CacheContext {
   }
 
   public CacheUnit getCache(long fileId, long length, long begin, long end, LockTask task) {
+    long startTime = System.currentTimeMillis();
     FileCacheUnit unit = mFileIdToInternalList.get(fileId);
     if (unit == null) {
       unit = new FileCacheUnit(fileId, length, this);
       mFileIdToInternalList.put(fileId, unit);
     }
     if (USE_INDEX_0) {
-      return unit.getKeyFromBucket(begin, end, task);
+      CacheUnit u = unit.getKeyFromBucket(begin, end, task);
+      HitRatioMetric.INSTANCE.GetUnitTimeCost += (System.currentTimeMillis() - startTime);
+      return u;
     }
     if (!REVERSE) {
-      return getKey2(begin, end, fileId, task);
+      CacheUnit u = getKey2(begin, end, fileId, task);
+      HitRatioMetric.INSTANCE.GetUnitTimeCost += (System.currentTimeMillis() - startTime);
+      return u;
     } else {
-      return getKeyByReverse2(begin, end, fileId, -1, task);
+      CacheUnit u =  getKeyByReverse2(begin, end, fileId, -1, task);
+      HitRatioMetric.INSTANCE.GetUnitTimeCost += (System.currentTimeMillis() - startTime);
+      return u;
     }
   }
 
@@ -576,9 +584,10 @@ public class ClientCacheContext implements CacheContext {
    * @param unit
    */
   public CacheInternalUnit addCache(TempCacheUnit unit) {
-    // long beginTime = System.currentTimeMillis();
-    return mFileIdToInternalList.get(unit.mFileId).addCache(unit);
-    //insertTime += (System.currentTimeMillis() - beginTime);
+    long beginTime = System.currentTimeMillis();
+    CacheInternalUnit iUnit =  mFileIdToInternalList.get(unit.mFileId).addCache(unit);
+    HitRatioMetric.INSTANCE.AddUnitTimeCost += (System.currentTimeMillis() - beginTime);
+    return iUnit;
   }
 
   public void convertCache(TempCacheUnit unit, DoubleLinkedList<CacheInternalUnit> cacheList) {
@@ -597,6 +606,7 @@ public class ClientCacheContext implements CacheContext {
   }
 
   public long delete(CacheInternalUnit unit) {
+    long beginTime = System.currentTimeMillis();
     FileCacheUnit fileCache = mFileIdToInternalList.get(unit.getFileId());
     long deleteSize = unit.getSize();
 
@@ -604,6 +614,8 @@ public class ClientCacheContext implements CacheContext {
     fileCache.getCacheList().delete(unit);
     unit.clearData();
     unit = null;
+
+    HitRatioMetric.INSTANCE.DeleteUnitTimeCost += (System.currentTimeMillis() - beginTime);
 
     return deleteSize;
   }

@@ -1,5 +1,7 @@
 package alluxio.client.file.cache.core;
 
+import alluxio.client.HitMetric;
+import alluxio.client.file.cache.Metric.HitRatioMetric;
 import alluxio.client.file.cache.struct.LinkNode;
 import alluxio.client.file.cache.struct.RBTree;
 
@@ -61,6 +63,7 @@ public class LinkedFileBucket {
   }
 
   public void add(CacheInternalUnit unit) {
+    long st = System.currentTimeMillis();
     int index = getIndex(unit.getBegin(), unit.getEnd());
     LinkBucket bucket = mCacheIndex0[index];
     unit.initBucketIndex(index);
@@ -70,11 +73,14 @@ public class LinkedFileBucket {
     }
 
     bucket.addNew(unit);
+    HitRatioMetric.INSTANCE.BucketAddTimeCost += (System.currentTimeMillis() - st);
   }
 
   public void delete(CacheInternalUnit unit) {
+    long st = System.currentTimeMillis();
     int index = getIndex(unit.getBegin(), unit.getEnd());
     mCacheIndex0[index].delete(unit);
+    HitRatioMetric.INSTANCE.BucketDeleteTimeCost += (System.currentTimeMillis() - st);
   }
 
   private void readLockWithInit(int index) {
@@ -83,10 +89,12 @@ public class LinkedFileBucket {
   }
 
   public CacheUnit find(long begin, long end, LockTask newTask) {
+    long st = System.currentTimeMillis();
     int index = getIndex(begin, end);
     newTask.readLock(index);
     CacheUnit unit =  find0(index, begin, end, newTask );
     unit.setLockTask(newTask);
+    HitRatioMetric.INSTANCE.BucketFindTimeCost += (System.currentTimeMillis() - st);
     return unit;
   }
 
@@ -196,7 +204,9 @@ public class LinkedFileBucket {
     }
 
     private void test1(CacheInternalUnit unit) {
+      long st = System.currentTimeMillis();
       CacheInternalUnit uu = test(unit);
+      HitRatioMetric.INSTANCE.TestTimeCost += (System.currentTimeMillis() - st);
       if (uu != null) {
         System.out.println(unit);
         mCacheIndex1.print();
