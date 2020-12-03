@@ -2,6 +2,7 @@ package alluxio.client.file.cache.core;
 
 import alluxio.client.HitMetric;
 import alluxio.client.file.CacheParamSetter;
+import alluxio.client.file.cache.Metric.ClientCacheStatistics;
 import alluxio.client.file.cache.Metric.HitRatioMetric;
 
 import java.io.IOException;
@@ -36,18 +37,24 @@ public final class CacheManager {
   public int read(TempCacheUnit unit, byte[] b, int off, int readlen, long pos, boolean isAllowCache) throws IOException {
     int res = -1;
     long begin = System.currentTimeMillis();
+    long st = System.currentTimeMillis();
     res = unit.lazyRead(b, off, readlen, pos, isAllowCache);
+    ClientCacheStatistics.INSTANCE.lazyReadTime += (System.currentTimeMillis() - st);
     BaseCacheUnit unit1 = new BaseCacheUnit(unit.getFileId(), pos, pos + res);
     unit1.setCurrentHitVal(unit.getNewCacheSize());
     HitMetric.mMissSize += unit.getNewCacheSize();
     if (!isPromotion) {
       if (isAllowCache) {
+        long evictST = System.currentTimeMillis();
         CacheInternalUnit resultUnit = mCacheContext.addCache(unit);
         FileCacheUnit uu = mCacheContext.mFileIdToInternalList.get(unit.getFileId());
         int i = uu.mBuckets.getIndex(resultUnit.getBegin(), resultUnit.getEnd());
-        uu.mBuckets.mCacheIndex0[i].test();
+        long testSt = System.currentTimeMillis();
+//        uu.mBuckets.mCacheIndex0[i].test();
+        ClientCacheStatistics.INSTANCE.testTime += (System.currentTimeMillis() - testSt);
         evictor.fliter(resultUnit, unit1);
         evictor.check(unit);
+        ClientCacheStatistics.INSTANCE.evictTime += (System.currentTimeMillis() - evictST);
       } else {
         evictor.fliter(null, unit1);
       }

@@ -12,6 +12,7 @@
 package alluxio.client.file.cache.core;
 
 import alluxio.client.file.FileInStream;
+import alluxio.client.file.cache.Metric.ClientCacheStatistics;
 import alluxio.client.file.cache.struct.LinkNode;
 import alluxio.client.file.cache.struct.LongPair;
 

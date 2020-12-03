@@ -14,6 +14,7 @@ package alluxio.client.file.cache.core;
 import alluxio.client.file.FileInStream;
 import alluxio.client.file.FileSystemContext;
 import alluxio.client.file.URIStatus;
+import alluxio.client.file.cache.Metric.ClientCacheStatistics;
 import alluxio.client.file.cache.Metric.HitRatioMetric;
 import alluxio.client.file.options.InStreamOptions;
 import alluxio.exception.PreconditionMessage;
@@ -58,6 +59,7 @@ public class FileInStreamWithCache extends FileInStream {
     if (res > 0) mPosition += res;
     HitRatioMetric.INSTANCE.ReadUFSTimeCost += (System.currentTimeMillis() - st);
     HitRatioMetric.INSTANCE.ReadUFSCount.incrementAndGet();
+    ClientCacheStatistics.INSTANCE.readUFSTime += (System.currentTimeMillis() - st);
     return res;
   }
 
@@ -70,6 +72,7 @@ public class FileInStreamWithCache extends FileInStream {
     testRead.actualRead += System.currentTimeMillis() - b1;
     HitRatioMetric.INSTANCE.ReadUFSTimeCost += (System.currentTimeMillis() - st);
     HitRatioMetric.INSTANCE.ReadUFSCount.incrementAndGet();
+    ClientCacheStatistics.INSTANCE.readUFSTime += (System.currentTimeMillis() - st);
     return res;
   }
 
@@ -101,6 +104,7 @@ public class FileInStreamWithCache extends FileInStream {
         CacheUnit unit;
         long beginForFixLength = 0;
         long endForFixLength = 0;
+        long st = System.currentTimeMillis();
         if (mCachePolicy.isFixedLength()) {
           beginForFixLength = pos / CACHE_SIZE * CACHE_SIZE;
           long endInd = (pos + len)/ CACHE_SIZE;
@@ -114,17 +118,20 @@ public class FileInStreamWithCache extends FileInStream {
           unit = mCacheContext.getCache(mFileId, mLength, pos, Math.min(pos + len,
                   mLength), task);
         }
+        ClientCacheStatistics.INSTANCE.getCacheTime += (System.currentTimeMillis() - st);
         unit.setLockTask(task);
         if (unit.isFinish()) {
           ClientCacheContext.allHitTime ++;
-
+          long st1 = System.currentTimeMillis();
           Preconditions.checkArgument(pos >= unit.getBegin());
           int remaining = mCachePolicy.read((CacheInternalUnit) unit, b, off, pos, len);
           if (!isPosition) {
             mPosition += remaining;
           }
+          ClientCacheStatistics.INSTANCE.readUnitTime += (System.currentTimeMillis() - st1);
           return remaining;
         } else {
+          long st1 = System.currentTimeMillis();
           TempCacheUnit tmpUnit = (TempCacheUnit) unit;
           tmpUnit.setInStream(this);
           if (mCachePolicy.isFixedLength()) {
@@ -147,6 +154,7 @@ public class FileInStreamWithCache extends FileInStream {
             // the end of file
             tmpUnit.resetEnd((int) mLength);
           }
+          ClientCacheStatistics.INSTANCE.readTmpUnitTime += (System.currentTimeMillis() - st1);
         }
       } finally {
         FixLengthReadNote.discardNote();

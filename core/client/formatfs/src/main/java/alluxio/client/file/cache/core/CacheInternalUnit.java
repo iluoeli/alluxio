@@ -11,6 +11,7 @@
 
 package alluxio.client.file.cache.core;
 
+import alluxio.client.file.cache.Metric.ClientCacheStatistics;
 import alluxio.client.file.cache.Metric.HitRatioMetric;
 import alluxio.client.file.cache.struct.LinkNode;
 import alluxio.client.file.cache.struct.LongPair;
@@ -204,7 +205,9 @@ public class CacheInternalUnit extends LinkNode<CacheInternalUnit> implements Ca
     if (begin > newBegin) {
       int currentLeftCanReadLen = current.capacity() - (int) (begin - newBegin);
       int readLen = Math.min(currentLeftCanReadLen, leftToRead);
+      long startTick = System.currentTimeMillis();
       current.getBytes((int) (begin - newBegin), b, off, readLen);
+      ClientCacheStatistics.INSTANCE.copyBufferTime += (System.currentTimeMillis() - startTick);
       leftToRead -= readLen;
       if (FixLengthReadNote.isIsUsingNote()) {
         hitLen += FixLengthReadNote.realHitLen(begin, readLen);
@@ -220,7 +223,9 @@ public class CacheInternalUnit extends LinkNode<CacheInternalUnit> implements Ca
 
     while (leftToRead > 0) {
       int readLen = Math.min(current.capacity(), leftToRead);
+      long startTick = System.currentTimeMillis();
       current.getBytes(0, b, off + readedLen, readLen);
+      ClientCacheStatistics.INSTANCE.copyBufferTime += (System.currentTimeMillis() - startTick);
       leftToRead -= readLen;
       if (FixLengthReadNote.isIsUsingNote()) {
         hitLen += FixLengthReadNote.realHitLen(newBegin, readLen);
