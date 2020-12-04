@@ -57,8 +57,6 @@ public class FileInStreamWithCache extends FileInStream {
     long st = System.currentTimeMillis();
     int res = super.read(b, off, len);
     if (res > 0) mPosition += res;
-    HitRatioMetric.INSTANCE.ReadUFSTimeCost += (System.currentTimeMillis() - st);
-    HitRatioMetric.INSTANCE.ReadUFSCount.incrementAndGet();
     ClientCacheStatistics.INSTANCE.readUFSTime += (System.currentTimeMillis() - st);
     return res;
   }
@@ -70,8 +68,6 @@ public class FileInStreamWithCache extends FileInStream {
     missSize += res;
     missTime ++;
     testRead.actualRead += System.currentTimeMillis() - b1;
-    HitRatioMetric.INSTANCE.ReadUFSTimeCost += (System.currentTimeMillis() - st);
-    HitRatioMetric.INSTANCE.ReadUFSCount.incrementAndGet();
     ClientCacheStatistics.INSTANCE.readUFSTime += (System.currentTimeMillis() - st);
     return res;
   }

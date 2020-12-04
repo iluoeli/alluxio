@@ -247,7 +247,6 @@ public class ClientCacheContext implements CacheContext {
   }
 
   public CacheUnit getCache(long fileId, long length, long begin, long end, LockTask task) {
-    long startTime = System.currentTimeMillis();
     FileCacheUnit unit = mFileIdToInternalList.get(fileId);
     if (unit == null) {
       unit = new FileCacheUnit(fileId, length, this);
@@ -255,16 +254,13 @@ public class ClientCacheContext implements CacheContext {
     }
     if (USE_INDEX_0) {
       CacheUnit u = unit.getKeyFromBucket(begin, end, task);
-      HitRatioMetric.INSTANCE.GetUnitTimeCost += (System.currentTimeMillis() - startTime);
       return u;
     }
     if (!REVERSE) {
       CacheUnit u = getKey2(begin, end, fileId, task);
-      HitRatioMetric.INSTANCE.GetUnitTimeCost += (System.currentTimeMillis() - startTime);
       return u;
     } else {
       CacheUnit u =  getKeyByReverse2(begin, end, fileId, -1, task);
-      HitRatioMetric.INSTANCE.GetUnitTimeCost += (System.currentTimeMillis() - startTime);
       return u;
     }
   }
@@ -584,9 +580,7 @@ public class ClientCacheContext implements CacheContext {
    * @param unit
    */
   public CacheInternalUnit addCache(TempCacheUnit unit) {
-    long beginTime = System.currentTimeMillis();
     CacheInternalUnit iUnit =  mFileIdToInternalList.get(unit.mFileId).addCache(unit);
-    HitRatioMetric.INSTANCE.AddUnitTimeCost += (System.currentTimeMillis() - beginTime);
     return iUnit;
   }
 
@@ -606,7 +600,6 @@ public class ClientCacheContext implements CacheContext {
   }
 
   public long delete(CacheInternalUnit unit) {
-    long beginTime = System.currentTimeMillis();
     FileCacheUnit fileCache = mFileIdToInternalList.get(unit.getFileId());
     long deleteSize = unit.getSize();
 
@@ -614,8 +607,6 @@ public class ClientCacheContext implements CacheContext {
     fileCache.getCacheList().delete(unit);
     unit.clearData();
     unit = null;
-
-    HitRatioMetric.INSTANCE.DeleteUnitTimeCost += (System.currentTimeMillis() - beginTime);
 
     return deleteSize;
   }

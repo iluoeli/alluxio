@@ -35,13 +35,11 @@ public class TraditionalLRUEvictor implements CachePolicy {
 
     @Override
     public void check(TempCacheUnit unit) {
-        long st = System.currentTimeMillis();
         add(unit);
 //        long newSize = getNewSize(unit);
         if (visitMap.size() * blockSize > limit) {
             evict();
         }
-        HitRatioMetric.INSTANCE.LRUChecks += (System.currentTimeMillis() - st);
     }
     public long evict() {
         long size = visitMap.size() * blockSize;
@@ -84,13 +82,11 @@ public class TraditionalLRUEvictor implements CachePolicy {
 
     @Override
     public void fliter(CacheInternalUnit unit, BaseCacheUnit unit1) {
-        long st = System.currentTimeMillis();
         if (unit != null) {
             unit.accessRecord.add(unit1);
         }
 
         this.add(unit1);
-        HitRatioMetric.INSTANCE.LRUFliter += (System.currentTimeMillis() - st);
     }
     public void fakeFliter(BaseCacheUnit unit1) {
 
