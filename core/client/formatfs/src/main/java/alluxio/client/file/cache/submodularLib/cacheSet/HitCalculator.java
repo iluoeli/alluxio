@@ -31,6 +31,9 @@ public class HitCalculator extends CacheHitCalculator {
 
 
   public void countHitRatio(BaseCacheUnit unit) {
+    if (mContext == null || unit == null || mFileIdToLength == null) {
+      return;
+    }
     CacheUnit unit1 = mContext.getCache(unit.getFileId(), mFileIdToLength.get(unit.getFileId()), unit.getBegin(), unit.getEnd(), mLockTask);
     CacheInternalUnit res;
     if (!unit1.isFinish()) {
