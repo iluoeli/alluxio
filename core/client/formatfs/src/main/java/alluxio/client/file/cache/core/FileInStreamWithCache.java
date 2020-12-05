@@ -21,6 +21,7 @@ import alluxio.exception.PreconditionMessage;
 import com.google.common.base.Preconditions;
 
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.Iterator;
 
 import static alluxio.client.file.cache.core.ClientCacheContext.*;
@@ -98,8 +99,8 @@ public class FileInStreamWithCache extends FileInStream {
         ClientCacheContext.readTask = task;
 
         CacheUnit unit;
-        long beginForFixLength = 0;
-        long endForFixLength = 0;
+        long beginForFixLength = pos;
+        long endForFixLength = pos + len;
         long st = System.currentTimeMillis();
         if (mCachePolicy.isFixedLength()) {
           beginForFixLength = pos / CACHE_SIZE * CACHE_SIZE;
@@ -136,10 +137,11 @@ public class FileInStreamWithCache extends FileInStream {
             res = mCachePolicy.read(tmpUnit, cachedBuf, off, (int)(endForFixLength-beginForFixLength), beginForFixLength, mCacheContext.isAllowCache());
 
             if (res != -1) {
-              for(int i = 0; i < len; i ++) {
-                b[i] = cachedBuf[(int) (pos - beginForFixLength) + i];
-              }
+//              for(int i = 0; i < len; i ++) {
+//                b[i] = cachedBuf[(int) (pos - beginForFixLength) + i];
+//              }
 //              b = Arrays.copyOfRange(cachedBuf, (int) (pos - beginForFixLength), len);
+              System.arraycopy(cachedBuf, (int) (pos - beginForFixLength), b, 0, len);
               res = len;
               HitRatioMetric.INSTANCE.accessSize = preAccessSize + res;
             }

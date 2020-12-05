@@ -255,6 +255,7 @@ public class TempCacheUnit extends LinkNode<TempCacheUnit> implements CacheUnit 
             if (readLength != -1) {
               if (isCache) addCache(b, distPos, readLength);
               mNewCacheSize += readLength;
+              ClientCacheStatistics.INSTANCE.bytesRead += readLength;
             }
           }
           // change read variable
@@ -281,6 +282,7 @@ public class TempCacheUnit extends LinkNode<TempCacheUnit> implements CacheUnit 
         if (readLength > 0) {
           if (isCache) addCache(b, off, readLength);
           mNewCacheSize += readLength;
+          ClientCacheStatistics.INSTANCE.bytesRead += readLength;
         }
 
         return readLength;

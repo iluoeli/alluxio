@@ -8,4 +8,9 @@ public enum HitRatioMetric {
   public double getHitRatio() {
     return (double)hitSize / accessSize;
   }
+
+  public void clear() {
+    hitSize = 0;
+    accessSize = 0;
+  }
 }

@@ -3,6 +3,9 @@ package alluxio.client.file.cache.Metric;
 public enum ClientCacheStatistics {
     INSTANCE;
 
+    public long bytesHit;
+    public long bytesRead;
+
     public long readUFSTime;
     public long readCacheTime;
     public long copyBufferTime;
@@ -15,6 +18,8 @@ public enum ClientCacheStatistics {
     public long testTime;
 
     public void clear() {
+        bytesHit = 0;
+        bytesRead = 0;
         readUFSTime = 0;
         readCacheTime = 0;
         copyBufferTime = 0;
@@ -27,10 +32,16 @@ public enum ClientCacheStatistics {
         testTime = 0;
     }
 
+    public double hitRatio() {
+        return bytesHit / (double) bytesRead;
+    }
+
     @Override
     public String toString() {
         return "ClientCacheStatistics{" +
-                "readUFSTime=" + readUFSTime +
+                "bytesHit=" + bytesHit +
+                ", bytesRead=" + bytesRead +
+                ", readUFSTime=" + readUFSTime +
                 ", readCacheTime=" + readCacheTime +
                 ", copyBufferTime=" + copyBufferTime +
                 ", getCacheTime=" + getCacheTime +

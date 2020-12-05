@@ -241,8 +241,11 @@ public class CacheInternalUnit extends LinkNode<CacheInternalUnit> implements Ca
       }
     }
 
-
     HitRatioMetric.INSTANCE.hitSize += hitLen;
+    ClientCacheStatistics.INSTANCE.bytesHit += hitLen;
+    ClientCacheStatistics.INSTANCE.bytesRead += hitLen;
+
+
     return readedLen;
   }
 
