@@ -1,6 +1,7 @@
 package alluxio.client.file.cache.submodularLib;
 
 import alluxio.client.file.CacheParamSetter;
+import alluxio.client.file.cache.Metric.ClientCacheStatistics;
 import alluxio.client.file.cache.core.*;
 import alluxio.collections.Pair;
 import org.apache.commons.lang3.RandomUtils;
@@ -47,6 +48,7 @@ public class TraditionalLFUEvictor implements CachePolicy {
         if (getBlockNum() * blockSize > limit) {
             evict();
         }
+        ClientCacheStatistics.INSTANCE.cacheSpaceUsed = getBlockNum() * blockSize;
     }
 
     public void clear() {

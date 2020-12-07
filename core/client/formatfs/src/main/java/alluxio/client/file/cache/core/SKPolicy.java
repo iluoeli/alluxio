@@ -1,5 +1,6 @@
 package alluxio.client.file.cache.core;
 
+import alluxio.client.file.cache.Metric.ClientCacheStatistics;
 import alluxio.client.file.cache.submodularLib.ISK;
 import alluxio.client.file.cache.submodularLib.IterateOptimizer;
 import alluxio.client.file.cache.submodularLib.cacheSet.CacheSet;
@@ -262,6 +263,7 @@ public enum SKPolicy implements CachePolicy, Runnable {
 
   public void check(TempCacheUnit unit) {
     mCacheSize += unit.getNewCacheSize();
+    ClientCacheStatistics.INSTANCE.cacheSpaceUsed = mCacheSize;
     // if(RL) {
     //  mRLAgent.AddCurrentReword(unit.getRealReadSize(), unit.getNewCacheSize());
     //}

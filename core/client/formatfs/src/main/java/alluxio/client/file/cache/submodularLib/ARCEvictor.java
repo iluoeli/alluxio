@@ -1,6 +1,7 @@
 package alluxio.client.file.cache.submodularLib;
 
 import alluxio.client.file.CacheParamSetter;
+import alluxio.client.file.cache.Metric.ClientCacheStatistics;
 import alluxio.client.file.cache.core.*;
 import com.github.pasa.cache.Loader;
 import com.github.pasa.cache.arc.ARCCache;
@@ -115,6 +116,7 @@ public class ARCEvictor implements CachePolicy {
             System.out.println("ARC cache overflow");
         }
         evict();
+        ClientCacheStatistics.INSTANCE.cacheSpaceUsed = innerCache.size()  * blockSize;
     }
 
     @Override

@@ -17,6 +17,8 @@ public enum ClientCacheStatistics {
     public long evictTime;
     public long testTime;
 
+    public long cacheSpaceUsed;
+
     public void clear() {
         bytesHit = 0;
         bytesRead = 0;
@@ -30,6 +32,7 @@ public enum ClientCacheStatistics {
         lazyReadTime = 0;
         evictTime = 0;
         testTime = 0;
+        cacheSpaceUsed = 0;
     }
 
     public double hitRatio() {
@@ -51,6 +54,7 @@ public enum ClientCacheStatistics {
                 ", lazyReadTime=" + lazyReadTime +
                 ", evictTime=" + evictTime +
                 ", testTime=" + testTime +
+                ", cacheSpaceUsed=" + cacheSpaceUsed +
                 '}';
     }
 }

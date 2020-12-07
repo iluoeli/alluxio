@@ -1,5 +1,6 @@
 package alluxio.client.file.cache.submodularLib.cacheSet;
 
+import alluxio.client.file.cache.Metric.ClientCacheStatistics;
 import alluxio.client.file.cache.core.*;
 import alluxio.client.file.cache.struct.DoubleLinkedList;
 import alluxio.client.file.cache.struct.LongPair;
@@ -201,6 +202,7 @@ public class DivideGR extends LRUPolicy {
         task.unlockAll();
       }
     }
+    ClientCacheStatistics.INSTANCE.cacheSpaceUsed = mCacheSize;
     return delete;
   }
 

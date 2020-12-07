@@ -1,6 +1,7 @@
 package alluxio.client.file.cache.submodularLib;
 
 import alluxio.client.file.CacheParamSetter;
+import alluxio.client.file.cache.Metric.ClientCacheStatistics;
 import alluxio.client.file.cache.Metric.HitRatioMetric;
 import alluxio.client.file.cache.core.*;
 
@@ -40,6 +41,7 @@ public class TraditionalLRUEvictor implements CachePolicy {
         if (visitMap.size() * blockSize > limit) {
             evict();
         }
+        ClientCacheStatistics.INSTANCE.cacheSpaceUsed = visitMap.size() * blockSize;
     }
     public long evict() {
         long size = visitMap.size() * blockSize;

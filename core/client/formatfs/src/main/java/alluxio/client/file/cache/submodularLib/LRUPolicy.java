@@ -1,5 +1,6 @@
 package alluxio.client.file.cache.submodularLib;
 
+import alluxio.client.file.cache.Metric.ClientCacheStatistics;
 import alluxio.client.file.cache.core.*;
 
 import java.util.HashSet;
@@ -48,7 +49,7 @@ public class LRUPolicy implements CachePolicy {
       mCacheSize -= evict(unit.newSize + mCacheSize, mCacheCapacity);
     }
     mCacheSize += unit.getNewCacheSize();
-
+    ClientCacheStatistics.INSTANCE.cacheSpaceUsed = mCacheSize;
   }
 
   public synchronized void check(long newSize) {
