@@ -9,10 +9,10 @@ import org.apache.commons.lang3.RandomUtils;
 public class CacheBenchmark {
 
     //  0               1               2               3               4       5
-    // <alluxioURI>  <cachePolicy> <cacheCapacityInGiga> <blockSize> <mode>   <giga>
+    // <alluxioURI>  <cachePolicy> <cacheCapacity> <blockSize>        <mode>   <giga>
     public static void main(String[] args) {
         if (args.length != 7) {
-            System.out.println("Usage: <alluxioURI> <useCache> <cachePolicy> <cacheCapacity> <blockSize> <mode>");
+            System.out.println("Usage: <alluxioURI>  <cachePolicy> <cacheCapacity> <blockSize>        <mode>   <giga>");
             System.exit(1);
         }
         AlluxioURI alluxioURI = new AlluxioURI(args[0]);
@@ -25,6 +25,9 @@ public class CacheBenchmark {
         initSetting(policy, cachePacity, blockSize, mode);
 
         randomTest(alluxioURI, cacheInGiga);
+
+        System.gc();
+        System.exit(0);
     }
 
     static void initSetting(String policy, long cacheCapacity, int blockSize, String mode) {
